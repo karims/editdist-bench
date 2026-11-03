@@ -7,7 +7,18 @@ ARCHFLAGS := $(shell $(CC) -mcpu=native -x c -c /dev/null -o /dev/null 2>/dev/nu
 
 LIB := build/libmyers.so
 
-all: $(LIB)
+# CPython extension; build with the venv's interpreter, e.g. make PY=.venv/bin/python
+PY      ?= python3
+PYINC   := $(shell $(PY) -c "import sysconfig; print(sysconfig.get_paths()['include'])" 2>/dev/null)
+EXTSUF  := $(shell $(PY) -c "import sysconfig; print(sysconfig.get_config_var('EXT_SUFFIX'))" 2>/dev/null)
+EXT     := build/_edpy$(EXTSUF)
+EXTLDFLAGS := $(if $(filter Darwin,$(shell uname -s)),-undefined dynamic_lookup,)
+
+all: $(LIB) $(EXT)
+
+$(EXT): csrc/edpy.c csrc/myers.c Makefile
+	@mkdir -p build
+	$(CC) $(CFLAGS) $(ARCHFLAGS) -I$(PYINC) -shared $(EXTLDFLAGS) -o $@ csrc/edpy.c
 
 $(LIB): csrc/myers.c Makefile
 	@mkdir -p build

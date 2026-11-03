@@ -26,6 +26,8 @@ def _lib():
     lib = ctypes.CDLL(LIB_PATH)
     lib.ed_pairs.argtypes = [_P_U8, _P_I64, _P_U8, _P_I64, ctypes.c_int64, _P_I32]
     lib.ed_pairs.restype = ctypes.c_int
+    lib.ed_pairs_opt.argtypes = [_P_U8, _P_I64, _P_U8, _P_I64, ctypes.c_int64, _P_I32, ctypes.c_int]
+    lib.ed_pairs_opt.restype = ctypes.c_int
     lib.ed_cross.argtypes = [_P_U8, _P_I64, ctypes.c_int64, _P_U8, _P_I64, ctypes.c_int64, _P_I32]
     lib.ed_cross.restype = ctypes.c_int
     return lib
@@ -50,11 +52,11 @@ def pack(strings: list[str]) -> tuple[np.ndarray, np.ndarray]:
     return buf, off
 
 
-def pairs(packed_a, packed_b) -> np.ndarray:
+def pairs(packed_a, packed_b, trim: bool = False) -> np.ndarray:
     (ba, oa), (bb, ob) = packed_a, packed_b
     n = len(oa) - 1
     out = np.empty(n, dtype=np.int32)
-    if lib().ed_pairs(ba, oa, bb, ob, n, out) != 0:
+    if lib().ed_pairs_opt(ba, oa, bb, ob, n, out, int(trim)) != 0:
         raise MemoryError("ed_pairs allocation failed")
     return out
 
@@ -74,3 +76,37 @@ def buildinfo() -> str:
             return f.read().strip()
     except OSError:
         return ""
+
+
+# ---------------- CPython extension (reads str/bytes in place) ----------------
+
+def _load_ext():
+    import importlib.util
+    import sysconfig
+    path = os.path.join(_ROOT, "build", "_edpy" + sysconfig.get_config_var("EXT_SUFFIX"))
+    if not os.path.exists(path):
+        return None
+    spec = importlib.util.spec_from_file_location("_edpy", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+_EXT = _load_ext()
+
+
+def ext_available() -> bool:
+    return _EXT is not None
+
+
+def ext_pairs(A, B, trim: bool = True) -> np.ndarray:
+    """A, B: sequences of str (all chars <= U+00FF) or bytes, same length."""
+    out = np.empty(len(A), dtype=np.int32)
+    _EXT.pairs(A, B, out, trim)
+    return out
+
+
+def ext_cross(Q, C) -> np.ndarray:
+    out = np.empty((len(Q), len(C)), dtype=np.int32)
+    _EXT.cross(Q, C, out)
+    return out
