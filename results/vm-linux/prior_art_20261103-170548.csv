@@ -1,0 +1,49 @@
+bucket,alphabet,length,error_rate,shape,contender,threads,n_pairs,cells,gate,mismatches_vs_consensus,prep_s,median_s,iqr_s,inner_repeats,pairs_per_s,gcups,ns_per_pair,e2e_pairs_per_s,checksum,note
+bytes-L16-e0.01,bytes,16,0.01,pairs,rapidfuzz.cpdist,1,5000,1279984,pass,0,0.000000,0.000219,0.000002,191,22796148.3,5.8357,43.9,22783164.0,5000,
+bytes-L16-e0.01,bytes,16,0.01,pairs,rapidfuzz.cpdist,all,5000,1279984,pass,0,0.000000,0.001439,0.000327,50,3474878.6,0.8896,287.8,3474576.8,5000,
+bytes-L16-e0.01,bytes,16,0.01,pairs,rapidfuzz.distance-loop,1,5000,1279984,pass,0,0.000000,0.000424,0.000002,117,11783041.0,3.0164,84.9,11779571.2,5000,one Python call per pair; measures call overhead
+bytes-L16-e0.01,bytes,16,0.01,pairs,stringzilla.1x1-loop,1,5000,1279984,pass,0,0.002866,0.002316,0.000052,22,2158880.5,0.5527,463.2,964860.2,5000,5.x has no pairwise API; one 1x1 matrix call per pair
+bytes-L16-e0.01,bytes,16,0.01,pairs,edlib.align-loop,1,5000,1279984,pass,0,0.000000,0.005026,0.003940,10,994849.2,0.2547,1005.2,994824.4,5000,one Python call per pair; edlib has no batch API
+bytes-L16-e0.01,bytes,16,0.01,pairs,ours.c-myers-plain,1,5000,1279984,pass,0,0.000732,0.000245,0.000002,197,20416359.0,5.2265,49.0,5119532.6,5000,"phase 3: one pair at a time, no SIMD, one call per batch"
+bytes-L16-e0.01,bytes,16,0.01,pairs,ours.c-myers-trim,1,5000,1279984,pass,0,0.000734,0.000060,0.000003,455,82900861.1,21.2224,12.1,6298712.6,5000,phase 3b ablation: plain + common prefix/suffix trimming
+bytes-L16-e0.01,bytes,16,0.01,pairs,ours.c-myers-ext,1,5000,1279984,pass,0,0.000000,0.000068,0.000119,399,73010064.1,18.6903,13.7,72877044.1,5000,phase 3b: trim + reads Python str in place (no conversion)
+bytes-L32-e0.01,bytes,32,0.01,pairs,rapidfuzz.cpdist,1,5000,5118848,pass,0,0.000000,0.000254,0.000009,178,19656833.7,20.1241,50.9,19647178.5,5000,
+bytes-L32-e0.01,bytes,32,0.01,pairs,rapidfuzz.cpdist,all,5000,5118848,pass,0,0.000000,0.001138,0.000472,23,4392771.0,4.4972,227.6,4392288.7,5000,
+bytes-L32-e0.01,bytes,32,0.01,pairs,rapidfuzz.distance-loop,1,5000,5118848,pass,0,0.000000,0.000450,0.000003,110,11104315.9,11.3683,90.1,11101234.1,5000,one Python call per pair; measures call overhead
+bytes-L32-e0.01,bytes,32,0.01,pairs,stringzilla.1x1-loop,1,5000,5118848,pass,0,0.002779,0.003370,0.000030,15,1483785.9,1.5191,674.0,813199.8,5000,5.x has no pairwise API; one 1x1 matrix call per pair
+bytes-L32-e0.01,bytes,32,0.01,pairs,edlib.align-loop,1,5000,5118848,pass,0,0.000000,0.007735,0.000188,7,646450.2,0.6618,1546.9,646439.8,5000,one Python call per pair; edlib has no batch API
+bytes-L32-e0.01,bytes,32,0.01,pairs,ours.c-myers-plain,1,5000,5118848,pass,0,0.000745,0.000510,0.000002,78,9796307.9,10.0292,102.1,3983599.1,5000,"phase 3: one pair at a time, no SIMD, one call per batch"
+bytes-L32-e0.01,bytes,32,0.01,pairs,ours.c-myers-trim,1,5000,5118848,pass,0,0.000744,0.000095,0.000002,392,52534828.2,53.7836,19.0,5957345.7,5000,phase 3b ablation: plain + common prefix/suffix trimming
+bytes-L32-e0.01,bytes,32,0.01,pairs,ours.c-myers-ext,1,5000,5118848,pass,0,0.000000,0.000103,0.000011,324,48347263.7,49.4965,20.7,48288897.4,5000,phase 3b: trim + reads Python str in place (no conversion)
+dna-L16-e0.01,dna,16,0.01,pairs,rapidfuzz.cpdist,1,5000,1279280,pass,0,0.000000,0.000223,0.000004,201,22435456.0,5.7402,44.6,22422879.3,5000,
+dna-L16-e0.01,dna,16,0.01,pairs,rapidfuzz.cpdist,all,5000,1279280,pass,0,0.000000,0.001062,0.000333,176,4709431.2,1.2049,212.3,4708876.8,5000,
+dna-L16-e0.01,dna,16,0.01,pairs,rapidfuzz.distance-loop,1,5000,1279280,pass,0,0.000000,0.000427,0.000008,117,11716843.0,2.9978,85.3,11713411.8,5000,one Python call per pair; measures call overhead
+dna-L16-e0.01,dna,16,0.01,pairs,stringzilla.1x1-loop,1,5000,1279280,pass,0,0.002715,0.002318,0.000016,21,2157364.3,0.5520,463.5,993456.1,5000,5.x has no pairwise API; one 1x1 matrix call per pair
+dna-L16-e0.01,dna,16,0.01,pairs,edlib.align-loop,1,5000,1279280,pass,0,0.000000,0.003471,0.000036,15,1440503.6,0.3686,694.2,1440451.7,5000,one Python call per pair; edlib has no batch API
+dna-L16-e0.01,dna,16,0.01,pairs,ours.c-myers-plain,1,5000,1279280,pass,0,0.000735,0.000295,0.000001,166,16943227.4,4.3350,59.0,4854669.8,5000,"phase 3: one pair at a time, no SIMD, one call per batch"
+dna-L16-e0.01,dna,16,0.01,pairs,ours.c-myers-trim,1,5000,1279280,pass,0,0.000726,0.000060,0.000003,503,83506383.6,21.3656,12.0,6362661.6,5000,phase 3b ablation: plain + common prefix/suffix trimming
+dna-L16-e0.01,dna,16,0.01,pairs,ours.c-myers-ext,1,5000,1279280,pass,0,0.000000,0.000070,0.000001,352,71870466.9,18.3885,13.9,71783792.5,5000,phase 3b: trim + reads Python str in place (no conversion)
+dna-L32-e0.01,dna,32,0.01,pairs,rapidfuzz.cpdist,1,5000,5121152,pass,0,0.000000,0.000255,0.000004,185,19586599.5,20.0612,51.1,19577013.3,5000,
+dna-L32-e0.01,dna,32,0.01,pairs,rapidfuzz.cpdist,all,5000,5121152,pass,0,0.000000,0.000955,0.000285,126,5238081.6,5.3650,190.9,5237395.7,5000,
+dna-L32-e0.01,dna,32,0.01,pairs,rapidfuzz.distance-loop,1,5000,5121152,pass,0,0.000000,0.000453,0.000004,111,11025559.2,11.2927,90.7,11022520.9,5000,one Python call per pair; measures call overhead
+dna-L32-e0.01,dna,32,0.01,pairs,stringzilla.1x1-loop,1,5000,5121152,pass,0,0.002819,0.003376,0.000018,15,1481221.8,1.5171,675.1,807096.0,5000,5.x has no pairwise API; one 1x1 matrix call per pair
+dna-L32-e0.01,dna,32,0.01,pairs,edlib.align-loop,1,5000,5121152,pass,0,0.000000,0.003949,0.000053,13,1266273.8,1.2970,789.7,1266233.7,5000,one Python call per pair; edlib has no batch API
+dna-L32-e0.01,dna,32,0.01,pairs,ours.c-myers-plain,1,5000,5121152,pass,0,0.000739,0.000627,0.000004,80,7976032.0,8.1693,125.4,3661318.9,5000,"phase 3: one pair at a time, no SIMD, one call per batch"
+dna-L32-e0.01,dna,32,0.01,pairs,ours.c-myers-trim,1,5000,5121152,pass,0,0.000734,0.000094,0.000005,403,53111048.9,54.3980,18.8,6039126.0,5000,phase 3b ablation: plain + common prefix/suffix trimming
+dna-L32-e0.01,dna,32,0.01,pairs,ours.c-myers-ext,1,5000,5121152,pass,0,0.000000,0.000106,0.000007,328,47265198.2,48.4105,21.2,47209413.7,5000,phase 3b: trim + reads Python str in place (no conversion)
+text-L16-e0.01,text,16,0.01,pairs,rapidfuzz.cpdist,1,5000,1280464,pass,0,0.000000,0.000225,0.000007,204,22211334.3,5.6882,45.0,22199007.5,5000,
+text-L16-e0.01,text,16,0.01,pairs,rapidfuzz.cpdist,all,5000,1280464,pass,0,0.000000,0.000989,0.000308,174,5056527.5,1.2949,197.8,5056098.0,5000,
+text-L16-e0.01,text,16,0.01,pairs,rapidfuzz.distance-loop,1,5000,1280464,pass,0,0.000000,0.000437,0.000003,117,11449503.9,2.9321,87.3,11447301.9,5000,one Python call per pair; measures call overhead
+text-L16-e0.01,text,16,0.01,pairs,stringzilla.1x1-loop,1,5000,1280464,pass,0,0.002793,0.002339,0.000038,23,2137659.0,0.5474,467.8,974190.7,5000,5.x has no pairwise API; one 1x1 matrix call per pair
+text-L16-e0.01,text,16,0.01,pairs,edlib.align-loop,1,5000,1280464,pass,0,0.000000,0.004503,0.000024,11,1110456.8,0.2844,900.5,1110426.0,5000,one Python call per pair; edlib has no batch API
+text-L16-e0.01,text,16,0.01,pairs,ours.c-myers-plain,1,5000,1280464,pass,0,0.000728,0.000262,0.000003,130,19103530.1,4.8923,52.3,5050812.5,5000,"phase 3: one pair at a time, no SIMD, one call per batch"
+text-L16-e0.01,text,16,0.01,pairs,ours.c-myers-trim,1,5000,1280464,pass,0,0.000733,0.000059,0.000004,495,84205870.6,21.5645,11.9,6311439.6,5000,phase 3b ablation: plain + common prefix/suffix trimming
+text-L16-e0.01,text,16,0.01,pairs,ours.c-myers-ext,1,5000,1280464,pass,0,0.000000,0.000066,0.000006,385,75570333.2,19.3530,13.2,75427829.5,5000,phase 3b: trim + reads Python str in place (no conversion)
+text-L32-e0.01,text,32,0.01,pairs,rapidfuzz.cpdist,1,5000,5119552,pass,0,0.000000,0.000256,0.000005,176,19525183.0,19.9920,51.2,19515656.8,5000,
+text-L32-e0.01,text,32,0.01,pairs,rapidfuzz.cpdist,all,5000,5119552,pass,0,0.000000,0.000931,0.001380,13,5373380.9,5.5019,186.1,5372901.7,5000,
+text-L32-e0.01,text,32,0.01,pairs,rapidfuzz.distance-loop,1,5000,5119552,pass,0,0.000000,0.000464,0.000004,112,10769817.5,11.0273,92.9,10767869.2,5000,one Python call per pair; measures call overhead
+text-L32-e0.01,text,32,0.01,pairs,stringzilla.1x1-loop,1,5000,5119552,pass,0,0.002781,0.003378,0.000034,15,1480221.8,1.5156,675.6,811848.0,5000,5.x has no pairwise API; one 1x1 matrix call per pair
+text-L32-e0.01,text,32,0.01,pairs,edlib.align-loop,1,5000,5119552,pass,0,0.000000,0.005920,0.000096,9,844608.5,0.8648,1184.0,844590.6,5000,one Python call per pair; edlib has no batch API
+text-L32-e0.01,text,32,0.01,pairs,ours.c-myers-plain,1,5000,5119552,pass,0,0.000758,0.000541,0.000003,90,9243481.1,9.4645,108.2,3850458.2,5000,"phase 3: one pair at a time, no SIMD, one call per batch"
+text-L32-e0.01,text,32,0.01,pairs,ours.c-myers-trim,1,5000,5119552,pass,0,0.000749,0.000097,0.000004,399,51741186.9,52.9783,19.3,5909810.5,5000,phase 3b ablation: plain + common prefix/suffix trimming
+text-L32-e0.01,text,32,0.01,pairs,ours.c-myers-ext,1,5000,5119552,pass,0,0.000000,0.000104,0.000004,284,47879021.7,49.0238,20.9,47840996.2,5000,phase 3b: trim + reads Python str in place (no conversion)
