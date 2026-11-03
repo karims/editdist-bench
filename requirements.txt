@@ -1,0 +1,6 @@
+pytest>=8
+rapidfuzz>=3.6
+edlib>=1.3.9
+stringzilla>=4.0
+stringzillas-cpus>=4.0
+numpy>=1.24
