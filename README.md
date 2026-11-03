@@ -48,3 +48,11 @@ python -m bench.run_prior_art               # full grid
 
 Run benchmarks on mains power, with other apps closed. Results are written to
 `results/prior_art_<timestamp>.csv` together with an environment JSON.
+Commit result files as they are; never edit them by hand.
+
+Each timed sample repeats the batch until it lasts ≥ 50 ms (the repeat count is
+recorded as `inner_repeats`), so sub-millisecond batches are not timer noise.
+
+Only results from the target hardware (Apple Silicon for phases 2–4) count.
+A smoke run on a 2-vCPU x86 cloud VM was used to check the harness and is not
+recorded as a result.
