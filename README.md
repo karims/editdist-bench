@@ -17,8 +17,9 @@ narrow question:
 | 0 | Problem definition and pre-registered hypotheses | done (see `docs/`) |
 | 1 | Dataset generator, reference implementations, tests | done |
 | 2 | Prior-art benchmark (RapidFuzz, StringZilla, edlib) | runner done, **numbers pending (run on target hardware)** |
-| 3 | Plain C Myers baseline | next |
-| 4 | Batched / SIMD (NEON) variants | later |
+| 3 | Plain C Myers baseline | done (VM, preliminary): kernel parity with libraries |
+| 3b | Prefix/suffix trimming + in-place `str` extension | done (VM, preliminary): up to 3.4x end-to-end on near-identical short pairs, parity at L64/20% |
+| 4 | Batched / SIMD (NEON) variants | next |
 | 5 | GPU (CUDA) variant | later |
 
 ## Layout
@@ -38,7 +39,7 @@ results/             raw benchmark output (committed, never edited by hand)
 ## Quick start
 
 ```bash
-./setup.sh                                  # venv (Python >= 3.10), deps, tests
+./setup.sh                                  # venv (Python >= 3.10), deps, C build, tests
 source .venv/bin/activate
 python -m bench.run_prior_art --quick       # ~ a few minutes
 python -m bench.run_prior_art               # full grid

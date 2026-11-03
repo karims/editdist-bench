@@ -55,3 +55,34 @@ repeated on native macOS.
   5% vs 14.1M at 20%); our kernel is error-rate independent. Likely cause:
   stripping the common prefix/suffix before the bit-parallel loop. Cheap, exact,
   and worth an ablation.
+
+### Phase 3b — preliminary (Linux VM on Apple M4; `bytes`/`dna`/`text`)
+
+Sources: `results/vm-linux/prior_art_20261103-170443.csv` (L16/64/256 at
+0.01/0.2; its L16-e0.01 bucket is degenerate, all pairs identical) and
+`results/vm-linux/prior_art_20261103-170548.csv` (L16/32 at 0.01 after the
+one-edit fix).
+
+End-to-end from Python lists, single thread, `ours.c-myers-ext` (in-place str
++ prefix/suffix trimming) vs the best library (RapidFuzz `cpdist` everywhere):
+
+| Bucket | Best library | Ours | Ratio |
+|---|---|---|---|
+| L16, 1 edit (all alphabets) | 22.2-22.8M | 71.8-75.4M | 3.2-3.4x |
+| L32, 1 edit (all alphabets) | 19.5-19.7M | 47.2-48.3M | 2.4-2.5x |
+| L16, 20% (3 edits) | 13.9M | 32.3M | 2.3x |
+| L64, 1% (1 edit) | 15.6M | 28.6M | 1.8x |
+| L64, 20% | 4.66M | 4.83M | 1.04x |
+| L256, 1% | 1.01M | 1.23M | 1.2x |
+| L256, 20% | 0.48M | 0.61M | 1.3x |
+
+Attribution (kernel-only ablation, same runs): trimming alone takes L16/20%
+from 19.8M to 33.9M pairs/s and L64/1% from 4.8M to 29.5M; at L64/20% it
+changes nothing (edits are spread out, little common affix). Reading str in
+place removes the 160-400 ns/pair conversion cost.
+
+Interpretation: these wins are engineering (per-pair overhead, a known exact
+shortcut), not a new algorithm. With few edits the trimmed core is tiny and
+per-pair overhead dominates; RapidFuzz spends ~40 ns/pair there, we ~14 ns.
+Where real DP work remains (L64/20%) we are at parity, which is the regime
+phase 4 (inter-pair SIMD) has to win.
