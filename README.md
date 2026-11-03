@@ -38,13 +38,16 @@ results/             raw benchmark output (committed, never edited by hand)
 ## Quick start
 
 ```bash
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-
-pytest -q                                   # correctness first
+./setup.sh                                  # venv (Python >= 3.10), deps, tests
+source .venv/bin/activate
 python -m bench.run_prior_art --quick       # ~ a few minutes
 python -m bench.run_prior_art               # full grid
 ```
+
+Python ≥ 3.10 is required: older Pythons resolve to StringZilla 4.x, whose
+`LevenshteinDistances` computes elementwise pairs instead of the 5.x
+query × candidate matrix (the adapter detects either, but 5.x is the baseline
+of record).
 
 Run benchmarks on mains power, with other apps closed. Results are written to
 `results/prior_art_<timestamp>.csv` together with an environment JSON.
