@@ -50,6 +50,8 @@ def collect() -> dict:
         info["stringzilla_semantics"] = stringzilla_semantics()
     except Exception:
         pass
+    from bench import cmyers
+    info["c_kernels"] = cmyers.buildinfo() or "not built"
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     info["git_commit"] = _run(["git", "-C", root, "rev-parse", "HEAD"])
     info["git_dirty"] = bool(_run(["git", "-C", root, "status", "--porcelain"]))

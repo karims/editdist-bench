@@ -86,6 +86,21 @@ def contenders() -> tuple[list[Contender], list[str]]:
     else:
         missing.append("edlib")
 
+    # ---------------- ours: plain C Myers (phase 3) ----------------
+    from bench import cmyers
+    if cmyers.available():
+        both = lambda A, B: (cmyers.pack(A), cmyers.pack(B))
+        out += [
+            Contender("ours.c-myers-plain", "pairs", "1", both,
+                      lambda st: cmyers.pairs(*st),
+                      note="phase 3: one pair at a time, no SIMD, one call per batch"),
+            Contender("ours.c-myers-plain", "cross", "1", both,
+                      lambda st: cmyers.cross(*st),
+                      note="phase 3: pattern loaded once per query"),
+        ]
+    else:
+        missing.append("ours.c-myers-plain (run `make`)")
+
     return out, missing
 
 
