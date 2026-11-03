@@ -64,31 +64,7 @@ def contenders() -> tuple[list[Contender], list[str]]:
 
     # ---------------- StringZilla ----------------
     if _have("stringzilla") and _have("stringzillas"):
-        import stringzilla as sz
-        import stringzillas as szs
-
-        def sz_cross(cores):
-            scope = szs.DeviceScope(cpu_cores=cores)
-            engine = szs.LevenshteinDistances(capabilities=scope)
-
-            def prep(A, B):
-                return (sz.Strs(A), sz.Strs(B))
-            return prep, (lambda st: engine(st[0], st[1], device=scope))
-
-        p1, r1 = sz_cross(1)
-        pa, ra = sz_cross(0)
-        out += [
-            Contender("stringzilla.LevenshteinDistances", "cross", "1", p1, r1),
-            Contender("stringzilla.LevenshteinDistances", "cross", "all", pa, ra),
-        ]
-        # No pairwise API: a 1x1 matrix per pair is the only exact option.
-        engine1 = szs.LevenshteinDistances(capabilities=szs.DeviceScope(cpu_cores=1))
-        scope1 = szs.DeviceScope(cpu_cores=1)
-        out.append(Contender(
-            "stringzilla.1x1-loop", "pairs", "1",
-            lambda A, B: [(sz.Strs([a]), sz.Strs([b])) for a, b in zip(A, B)],
-            lambda st: [int(engine1(x, y, device=scope1)[0, 0]) for x, y in st],
-            note="no pairwise API; one 1x1 matrix call per pair"))
+        out += _stringzilla_contenders()
     else:
         missing.append("stringzilla/stringzillas")
 
@@ -111,6 +87,62 @@ def contenders() -> tuple[list[Contender], list[str]]:
         missing.append("edlib")
 
     return out, missing
+
+
+def stringzilla_semantics() -> str:
+    """StringZilla changed the meaning of LevenshteinDistances between major
+    versions: 4.x returns elementwise distances for equal-length lists
+    ("pairwise"), 5.x returns the full queries x candidates matrix ("cross").
+    Detect it from behaviour rather than trusting version numbers."""
+    import stringzilla as sz
+    import stringzillas as szs
+    engine = szs.LevenshteinDistances(capabilities=szs.DeviceScope(cpu_cores=1))
+    try:
+        r = np.asarray(engine(sz.Strs(["ab", "cd"]), sz.Strs(["ab", "xx", "cd"])))
+        if r.shape == (2, 3):
+            return "cross"
+    except Exception:
+        pass
+    r = np.asarray(engine(sz.Strs(["ab", "cd"]), sz.Strs(["ab", "xx"])))
+    if r.shape == (2,):
+        return "pairwise"
+    raise RuntimeError(f"unrecognised StringZilla LevenshteinDistances output shape {r.shape}")
+
+
+def _stringzilla_contenders() -> list[Contender]:
+    import stringzilla as sz
+    import stringzillas as szs
+
+    mode = stringzilla_semantics()
+    out = []
+    for cores, threads in ((1, "1"), (0, "all")):
+        scope = szs.DeviceScope(cpu_cores=cores)
+        engine = szs.LevenshteinDistances(capabilities=scope)
+        call = (lambda e, s: (lambda st: e(st[0], st[1], device=s)))(engine, scope)
+
+        if mode == "cross":
+            out.append(Contender("stringzilla.LevenshteinDistances", "cross", threads,
+                                 lambda A, B: (sz.Strs(A), sz.Strs(B)), call))
+        else:
+            out.append(Contender("stringzilla.LevenshteinDistances", "pairs", threads,
+                                 lambda A, B: (sz.Strs(A), sz.Strs(B)), call))
+            # Cross shape through the pairwise API: expand Q x C into flat lists
+            # (expansion happens in prepare, i.e. untimed, but costs memory).
+            out.append(Contender(
+                "stringzilla.LevenshteinDistances(expanded)", "cross", threads,
+                lambda A, B: (sz.Strs([a for a in A for _ in B]), sz.Strs(list(B) * len(A))),
+                call, note="4.x pairwise API fed an expanded Q*C list"))
+
+    if mode == "cross":
+        # 5.x has no pairwise API: a 1x1 matrix per pair is the only exact option.
+        scope1 = szs.DeviceScope(cpu_cores=1)
+        engine1 = szs.LevenshteinDistances(capabilities=scope1)
+        out.append(Contender(
+            "stringzilla.1x1-loop", "pairs", "1",
+            lambda A, B: [(sz.Strs([a]), sz.Strs([b])) for a, b in zip(A, B)],
+            lambda st: [int(np.asarray(engine1(x, y, device=scope1)).ravel()[0]) for x, y in st],
+            note="5.x has no pairwise API; one 1x1 matrix call per pair"))
+    return out
 
 
 def as_vector(result) -> np.ndarray:

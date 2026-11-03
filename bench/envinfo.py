@@ -46,6 +46,8 @@ def collect() -> dict:
     try:
         import stringzillas as szs
         info["stringzilla_capabilities"] = list(getattr(szs, "__capabilities__", ()))
+        from bench.baselines import stringzilla_semantics
+        info["stringzilla_semantics"] = stringzilla_semantics()
     except Exception:
         pass
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
