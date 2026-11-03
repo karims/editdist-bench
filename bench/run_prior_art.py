@@ -21,7 +21,7 @@ import numpy as np
 
 from bench import envinfo
 from bench.baselines import as_vector, contenders
-from bench.datagen import grid, make_cross, make_pairs
+from bench.datagen import Bucket, grid, make_cross, make_pairs
 from bench.reference import myers_distance
 
 GATE_SAMPLE = 300
@@ -76,6 +76,9 @@ def main():
     ap.add_argument("--shape", choices=["pairs", "cross", "both"], default="both")
     ap.add_argument("--only", default="", help="substring filter on contender names")
     ap.add_argument("--out", default="results")
+    ap.add_argument("--lengths", default="", help="override grid, e.g. 16,64")
+    ap.add_argument("--errors", default="", help="override grid, e.g. 0.01,0.2")
+    ap.add_argument("--alphabets", default="", help="override grid, e.g. bytes,dna")
     args = ap.parse_args()
 
     n_pairs = args.pairs or (5000 if args.quick else 20000)
@@ -99,7 +102,17 @@ def main():
           f"{' (dirty)' if env['git_dirty'] else ''}", file=sys.stderr)
 
     rows = []
-    for bucket in grid(args.quick):
+    buckets = grid(args.quick)
+    sel_L = {int(x) for x in args.lengths.split(",")} if args.lengths else None
+    sel_E = {float(x) for x in args.errors.split(",")} if args.errors else None
+    sel_A = set(args.alphabets.split(",")) if args.alphabets else None
+    if sel_L or sel_E or sel_A:
+        from bench.datagen import ALPHABETS, ERROR_RATES, LENGTHS
+        buckets = [Bucket(L, e, a)
+                   for a in (sorted(sel_A) if sel_A else ALPHABETS)
+                   for L in (sorted(sel_L) if sel_L else LENGTHS)
+                   for e in (sorted(sel_E) if sel_E else ERROR_RATES)]
+    for bucket in buckets:
         for shape in ("pairs", "cross"):
             group = [c for c in cs if c.shape == shape]
             if not group:
