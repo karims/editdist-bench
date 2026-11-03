@@ -28,7 +28,7 @@ GATE_SAMPLE = 300
 FIELDS = ["bucket", "alphabet", "length", "error_rate", "shape", "contender", "threads",
           "n_pairs", "cells", "gate", "mismatches_vs_consensus", "prep_s",
           "median_s", "iqr_s", "inner_repeats", "pairs_per_s", "gcups", "ns_per_pair",
-          "checksum", "note"]
+          "e2e_pairs_per_s", "checksum", "note"]
 
 
 MIN_SAMPLE_S = 0.05   # each timed sample repeats the batch until it lasts this long
@@ -126,9 +126,13 @@ def main():
                     print(f"{bucket.name:22s} {shape:5s} {c.name:34s} {c.threads:>3s}  GATE {gate}",
                           file=sys.stderr)
                     continue
-                t0 = time.perf_counter()
-                state = c.prepare(A, B)
-                prep_s = time.perf_counter() - t0
+                state = c.prepare(A, B)                       # warm (imports, caches)
+                preps = []
+                for _ in range(3):
+                    t0 = time.perf_counter()
+                    state = c.prepare(A, B)
+                    preps.append(time.perf_counter() - t0)
+                prep_s = statistics.median(preps)
                 out, med, iqr, inner = _timed(c.run, state, args.reps)
                 vec = as_vector(out)
                 if consensus is None:
@@ -138,7 +142,9 @@ def main():
                     "mismatches_vs_consensus": mism,
                     "prep_s": f"{prep_s:.6f}", "median_s": f"{med:.6f}", "iqr_s": f"{iqr:.6f}",
                     "pairs_per_s": f"{n / med:.1f}", "gcups": f"{cells / med / 1e9:.4f}",
-                    "ns_per_pair": f"{med / n * 1e9:.1f}", "checksum": int(vec.sum()),
+                    "ns_per_pair": f"{med / n * 1e9:.1f}",
+                    "e2e_pairs_per_s": f"{n / (med + prep_s):.1f}",   # incl. conversion from Python lists
+                    "checksum": int(vec.sum()),
                     "inner_repeats": inner,
                 })
                 rows.append(row)

@@ -44,6 +44,11 @@ The `--quick` grid is L ∈ {16, 64, 256}, error ∈ {0.05, 0.20}, alphabet `byt
 - **Secondary:** DP cell updates per second (`L_a × L_b` per pair; the standard
   unit in the alignment literature), and ns per pair.
 - Every row reports the median and inter-quartile range over repetitions.
+- **End-to-end** pairs per second (`e2e_pairs_per_s`) additionally includes the
+  contender's conversion from Python lists (`prep_s`, median of 3). Libraries
+  that read Python strings directly pay that cost inside the timed call, so
+  kernel-only numbers favour contenders with a separate conversion step; both
+  are reported and claims must state which one they use.
 
 ## 4. Correctness rules
 
