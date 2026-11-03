@@ -3,6 +3,7 @@
 # Python >= 3.10 virtualenv, install dependencies, run the tests.
 set -euo pipefail
 cd "$(dirname "$0")"
+VENV="${VENV:-.venv}"   # e.g. VENV=.venv-linux when running inside a Linux VM
 
 # 1. Git history arrives as editdist-bench.bundle when files are copied in by a
 #    tool that cannot write .git directly.
@@ -38,15 +39,15 @@ fi
 echo "python: $PY ($("$PY" --version 2>&1))"
 
 # 3. Fresh virtualenv and dependencies.
-rm -rf .venv
-"$PY" -m venv .venv
-.venv/bin/python -m pip install -q --upgrade pip
-.venv/bin/python -m pip install -q -r requirements.txt
+rm -rf "$VENV"
+"$PY" -m venv "$VENV"
+"$VENV/bin/python" -m pip install -q --upgrade pip
+"$VENV/bin/python" -m pip install -q -r requirements.txt
 
 # 4. Correctness before anything else.
-.venv/bin/python -m pytest -q
+"$VENV/bin/python" -m pytest -q
 
 echo
 echo "Ready. Next:"
-echo "  source .venv/bin/activate"
+echo "  source $VENV/bin/activate"
 echo "  python -m bench.run_prior_art --quick"
