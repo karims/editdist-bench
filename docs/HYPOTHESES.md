@@ -38,4 +38,20 @@ after reasonable effort, we report the negative result and move to the GPU.
 
 ## Outcomes
 
-(appended later)
+### H3.1 — preliminary (Linux VM on Apple M4, 4 vCPUs; quick grid, `bytes` alphabet)
+
+Source: `results/vm-linux/prior_art_20261103-080405.csv`. Not official until
+repeated on native macOS.
+
+- **Kernel-only: holds.** Plain C Myers is 0.71-1.41x the best library for
+  pairs and 1.04-1.39x for cross, i.e. within 2x everywhere. The libraries'
+  speed comes from the algorithm, not from engineering we lack.
+- **End-to-end from Python lists: we lose on short pairs** (0.18-0.56x at
+  L <= 64) because converting Python strings to a byte buffer costs
+  160-400 ns/pair, more than the distance itself. RapidFuzz avoids this by
+  reading Python strings in C. Cross is unaffected (conversion is per string,
+  not per pair): 1.01-1.37x.
+- **Observation:** RapidFuzz is faster at low error rates (L16: 22.6M pairs/s at
+  5% vs 14.1M at 20%); our kernel is error-rate independent. Likely cause:
+  stripping the common prefix/suffix before the bit-parallel loop. Cheap, exact,
+  and worth an ablation.

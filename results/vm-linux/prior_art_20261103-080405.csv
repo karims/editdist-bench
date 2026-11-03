@@ -1,0 +1,73 @@
+bucket,alphabet,length,error_rate,shape,contender,threads,n_pairs,cells,gate,mismatches_vs_consensus,prep_s,median_s,iqr_s,inner_repeats,pairs_per_s,gcups,ns_per_pair,e2e_pairs_per_s,checksum,note
+bytes-L16-e0.05,bytes,16,0.05,pairs,rapidfuzz.cpdist,1,5000,1278512,pass,0,0.000000,0.000221,0.000005,193,22615089.4,5.7827,44.2,22598020.2,5000,
+bytes-L16-e0.05,bytes,16,0.05,pairs,rapidfuzz.cpdist,all,5000,1278512,pass,0,0.000000,0.002818,0.000522,11,1774427.3,0.4537,563.6,1774348.5,5000,
+bytes-L16-e0.05,bytes,16,0.05,pairs,rapidfuzz.distance-loop,1,5000,1278512,pass,0,0.000000,0.000419,0.000003,122,11943971.2,3.0541,83.7,11940405.8,5000,one Python call per pair; measures call overhead
+bytes-L16-e0.05,bytes,16,0.05,pairs,stringzilla.1x1-loop,1,5000,1278512,pass,0,0.002733,0.002297,0.000034,22,2176292.9,0.5565,459.5,993956.4,5000,5.x has no pairwise API; one 1x1 matrix call per pair
+bytes-L16-e0.05,bytes,16,0.05,pairs,edlib.align-loop,1,5000,1278512,pass,0,0.000000,0.005054,0.000082,10,989339.9,0.2530,1010.8,989315.4,5000,one Python call per pair; edlib has no batch API
+bytes-L16-e0.05,bytes,16,0.05,pairs,ours.c-myers-plain,1,5000,1278512,pass,0,0.000974,0.000244,0.000001,187,20482413.6,5.2374,48.8,4105556.0,5000,"phase 3: one pair at a time, no SIMD, one call per batch"
+bytes-L16-e0.05,bytes,16,0.05,cross,rapidfuzz.cdist,1,10000,2558400,pass,0,0.000000,0.000379,0.000003,127,26392306.9,6.7522,37.9,26383602.8,132980,
+bytes-L16-e0.05,bytes,16,0.05,cross,rapidfuzz.cdist,all,10000,2558400,pass,0,0.000000,0.001789,0.001435,27,5589628.1,1.4301,178.9,5589237.6,132980,
+bytes-L16-e0.05,bytes,16,0.05,cross,stringzilla.LevenshteinDistances,1,10000,2558400,pass,0,0.000003,0.000450,0.000005,109,22241758.7,5.6903,45.0,22082136.3,132980,
+bytes-L16-e0.05,bytes,16,0.05,cross,stringzilla.LevenshteinDistances,all,10000,2558400,pass,0,0.000003,0.000126,0.000007,335,79086530.3,20.2335,12.6,77377950.1,132980,
+bytes-L16-e0.05,bytes,16,0.05,cross,edlib.align-loop,1,10000,2558400,pass,0,0.000000,0.012451,0.000207,4,803153.1,0.2055,1245.1,803145.0,132980,nested Python loop
+bytes-L16-e0.05,bytes,16,0.05,cross,ours.c-myers-plain,1,10000,2558400,pass,0,0.000024,0.000354,0.000005,142,28285819.8,7.2366,35.4,26519850.2,132980,phase 3: pattern loaded once per query
+bytes-L16-e0.2,bytes,16,0.2,pairs,rapidfuzz.cpdist,1,5000,1278512,pass,0,0.000000,0.000355,0.000004,122,14085266.1,3.6016,71.0,14080308.0,14171,
+bytes-L16-e0.2,bytes,16,0.2,pairs,rapidfuzz.cpdist,all,5000,1278512,pass,0,0.000000,0.002081,0.000475,18,2402319.6,0.6143,416.3,2402223.8,14171,
+bytes-L16-e0.2,bytes,16,0.2,pairs,rapidfuzz.distance-loop,1,5000,1278512,pass,0,0.000000,0.000581,0.000004,88,8604435.5,2.2002,116.2,8603206.6,14171,one Python call per pair; measures call overhead
+bytes-L16-e0.2,bytes,16,0.2,pairs,stringzilla.1x1-loop,1,5000,1278512,pass,0,0.002732,0.002267,0.000082,22,2206015.1,0.5641,453.3,1000319.0,14171,5.x has no pairwise API; one 1x1 matrix call per pair
+bytes-L16-e0.2,bytes,16,0.2,pairs,edlib.align-loop,1,5000,1278512,pass,0,0.000000,0.005198,0.000062,10,961993.2,0.2460,1039.5,961970.1,14171,one Python call per pair; edlib has no batch API
+bytes-L16-e0.2,bytes,16,0.2,pairs,ours.c-myers-plain,1,5000,1278512,pass,0,0.000723,0.000252,0.000002,190,19876677.6,5.0825,50.3,5131883.8,14171,"phase 3: one pair at a time, no SIMD, one call per batch"
+bytes-L16-e0.2,bytes,16,0.2,cross,rapidfuzz.cdist,1,10000,2564790,pass,0,0.000000,0.000378,0.000002,124,26470368.7,6.7891,37.8,26461613.1,140101,
+bytes-L16-e0.2,bytes,16,0.2,cross,rapidfuzz.cdist,all,10000,2564790,pass,0,0.000000,0.001687,0.000710,43,5926085.8,1.5199,168.7,5925646.9,140101,
+bytes-L16-e0.2,bytes,16,0.2,cross,stringzilla.LevenshteinDistances,1,10000,2564790,pass,0,0.000003,0.000463,0.000007,105,21587374.3,5.5367,46.3,21446583.5,140101,
+bytes-L16-e0.2,bytes,16,0.2,cross,stringzilla.LevenshteinDistances,all,10000,2564790,pass,0,0.000003,0.000132,0.000006,326,75485386.7,19.3604,13.2,73927330.0,140101,
+bytes-L16-e0.2,bytes,16,0.2,cross,edlib.align-loop,1,10000,2564790,pass,0,0.000000,0.013393,0.000294,4,746643.6,0.1915,1339.3,746636.6,140101,nested Python loop
+bytes-L16-e0.2,bytes,16,0.2,cross,ours.c-myers-plain,1,10000,2564790,pass,0,0.000021,0.000349,0.000001,144,28636485.7,7.3447,34.9,27018128.4,140101,phase 3: pattern loaded once per query
+bytes-L64-e0.05,bytes,64,0.05,pairs,rapidfuzz.cpdist,1,5000,20473216,pass,0,0.000000,0.000750,0.000009,65,6664934.9,27.2905,150.0,6664188.7,14814,
+bytes-L64-e0.05,bytes,64,0.05,pairs,rapidfuzz.cpdist,all,5000,20473216,pass,0,0.000000,0.001784,0.000946,35,2803429.5,11.4790,356.7,2803233.0,14814,
+bytes-L64-e0.05,bytes,64,0.05,pairs,rapidfuzz.distance-loop,1,5000,20473216,pass,0,0.000000,0.000968,0.000006,52,5167928.7,21.1608,193.5,5167261.1,14814,one Python call per pair; measures call overhead
+bytes-L64-e0.05,bytes,64,0.05,pairs,stringzilla.1x1-loop,1,5000,20473216,pass,0,0.002713,0.005448,0.000116,10,917799.6,3.7581,1089.6,612680.9,14814,5.x has no pairwise API; one 1x1 matrix call per pair
+bytes-L64-e0.05,bytes,64,0.05,pairs,edlib.align-loop,1,5000,20473216,pass,0,0.000000,0.013434,0.000153,4,372197.5,1.5240,2686.7,372195.1,14814,one Python call per pair; edlib has no batch API
+bytes-L64-e0.05,bytes,64,0.05,pairs,ours.c-myers-plain,1,5000,20473216,pass,0,0.000801,0.001056,0.000010,47,4732861.8,19.3794,211.3,2691268.0,14814,"phase 3: one pair at a time, no SIMD, one call per batch"
+bytes-L64-e0.05,bytes,64,0.05,cross,rapidfuzz.cdist,1,10000,41036260,pass,0,0.000000,0.002309,0.000045,22,4331472.5,17.7747,230.9,4331238.0,510651,
+bytes-L64-e0.05,bytes,64,0.05,cross,rapidfuzz.cdist,all,10000,41036260,pass,0,0.000000,0.003193,0.000368,17,3132137.0,12.8531,319.3,3132014.4,510651,
+bytes-L64-e0.05,bytes,64,0.05,cross,stringzilla.LevenshteinDistances,1,10000,41036260,pass,0,0.000003,0.002360,0.000011,22,4237482.0,17.3890,236.0,4231430.4,510651,
+bytes-L64-e0.05,bytes,64,0.05,cross,stringzilla.LevenshteinDistances,all,10000,41036260,pass,0,0.000004,0.000672,0.000030,72,14878504.9,61.0558,67.2,14793215.8,510651,
+bytes-L64-e0.05,bytes,64,0.05,cross,edlib.align-loop,1,10000,41036260,pass,0,0.000000,0.033144,0.000265,2,301717.7,1.2381,3314.4,301716.6,510651,nested Python loop
+bytes-L64-e0.05,bytes,64,0.05,cross,ours.c-myers-plain,1,10000,41036260,pass,0,0.000022,0.001764,0.000030,29,5667904.7,23.2590,176.4,5598754.9,510651,phase 3: pattern loaded once per query
+bytes-L64-e0.2,bytes,64,0.2,pairs,rapidfuzz.cpdist,1,5000,20476224,pass,0,0.000000,0.001062,0.000008,47,4708770.1,19.2836,212.4,4708397.6,59683,
+bytes-L64-e0.2,bytes,64,0.2,pairs,rapidfuzz.cpdist,all,5000,20476224,pass,0,0.000000,0.001841,0.000758,15,2715440.0,11.1204,368.3,2715255.7,59683,
+bytes-L64-e0.2,bytes,64,0.2,pairs,rapidfuzz.distance-loop,1,5000,20476224,pass,0,0.000000,0.001274,0.000017,40,3925218.1,16.0747,254.8,3924832.9,59683,one Python call per pair; measures call overhead
+bytes-L64-e0.2,bytes,64,0.2,pairs,stringzilla.1x1-loop,1,5000,20476224,pass,0,0.002654,0.005465,0.000045,10,914876.1,3.7466,1093.0,615794.2,59683,5.x has no pairwise API; one 1x1 matrix call per pair
+bytes-L64-e0.2,bytes,64,0.2,pairs,edlib.align-loop,1,5000,20476224,pass,0,0.000000,0.013753,0.000086,4,363554.3,1.4888,2750.6,363551.0,59683,one Python call per pair; edlib has no batch API
+bytes-L64-e0.2,bytes,64,0.2,pairs,ours.c-myers-plain,1,5000,20476224,pass,0,0.000816,0.001069,0.000004,47,4679364.0,19.1631,213.7,2652665.9,59683,"phase 3: one pair at a time, no SIMD, one call per batch"
+bytes-L64-e0.2,bytes,64,0.2,cross,rapidfuzz.cdist,1,10000,40787340,pass,0,0.000000,0.002498,0.000040,20,4003666.6,16.3299,249.8,4003533.6,542972,
+bytes-L64-e0.2,bytes,64,0.2,cross,rapidfuzz.cdist,all,10000,40787340,pass,0,0.000000,0.003288,0.000792,11,3041036.7,12.4036,328.8,3040921.1,542972,
+bytes-L64-e0.2,bytes,64,0.2,cross,stringzilla.LevenshteinDistances,1,10000,40787340,pass,0,0.000004,0.003010,0.000047,17,3322705.6,13.5524,301.0,3318570.6,542972,
+bytes-L64-e0.2,bytes,64,0.2,cross,stringzilla.LevenshteinDistances,all,10000,40787340,pass,0,0.000003,0.000829,0.000043,59,12058596.6,49.1838,82.9,12010917.0,542972,
+bytes-L64-e0.2,bytes,64,0.2,cross,edlib.align-loop,1,10000,40787340,pass,0,0.000000,0.035504,0.000449,2,281656.9,1.1488,3550.4,281655.9,542972,nested Python loop
+bytes-L64-e0.2,bytes,64,0.2,cross,ours.c-myers-plain,1,10000,40787340,pass,0,0.000023,0.001799,0.000012,28,5557940.3,22.6694,179.9,5489044.6,542972,phase 3: pattern loaded once per query
+bytes-L256-e0.05,bytes,256,0.05,pairs,rapidfuzz.cpdist,1,5000,327748096,pass,0,0.000000,0.009290,0.000095,6,538201.9,35.2789,1858.0,538192.2,63555,
+bytes-L256-e0.05,bytes,256,0.05,pairs,rapidfuzz.cpdist,all,5000,327748096,pass,0,0.000000,0.009814,0.001548,6,509482.0,33.3964,1962.8,509475.5,63555,
+bytes-L256-e0.05,bytes,256,0.05,pairs,rapidfuzz.distance-loop,1,5000,327748096,pass,0,0.000000,0.009484,0.000079,6,527180.6,34.5565,1896.9,527175.9,63555,one Python call per pair; measures call overhead
+bytes-L256-e0.05,bytes,256,0.05,pairs,stringzilla.1x1-loop,1,5000,327748096,pass,0,0.003083,0.017953,0.000390,3,278500.0,18.2556,3590.7,237682.3,63555,5.x has no pairwise API; one 1x1 matrix call per pair
+bytes-L256-e0.05,bytes,256,0.05,pairs,edlib.align-loop,1,5000,327748096,pass,0,0.000000,0.057451,0.000280,1,87031.4,5.7049,11490.1,87031.3,63555,one Python call per pair; edlib has no batch API
+bytes-L256-e0.05,bytes,256,0.05,pairs,ours.c-myers-plain,1,5000,327748096,pass,0,0.001256,0.008505,0.000075,6,587899.6,38.5366,1701.0,512245.9,63555,"phase 3: one pair at a time, no SIMD, one call per batch"
+bytes-L256-e0.05,bytes,256,0.05,cross,rapidfuzz.cdist,1,10000,655129410,pass,0,0.000000,0.019482,0.000137,3,513293.2,33.6273,1948.2,513289.9,2011110,
+bytes-L256-e0.05,bytes,256,0.05,cross,rapidfuzz.cdist,all,10000,655129410,pass,0,0.000000,0.020988,0.002426,3,476456.1,31.2140,2098.8,476453.3,2011110,
+bytes-L256-e0.05,bytes,256,0.05,cross,stringzilla.LevenshteinDistances,1,10000,655129410,pass,0,0.000005,0.018558,0.000214,3,538851.6,35.3018,1855.8,538705.2,2011110,
+bytes-L256-e0.05,bytes,256,0.05,cross,stringzilla.LevenshteinDistances,all,10000,655129410,pass,0,0.000004,0.005264,0.000628,9,1899682.7,124.4538,526.4,1898105.2,2011110,
+bytes-L256-e0.05,bytes,256,0.05,cross,edlib.align-loop,1,10000,655129410,pass,0,0.000000,0.135559,0.001182,1,73768.7,4.8328,13555.9,73768.6,2011110,nested Python loop
+bytes-L256-e0.05,bytes,256,0.05,cross,ours.c-myers-plain,1,10000,655129410,pass,0,0.000025,0.017777,0.000300,3,562525.9,36.8527,1777.7,561724.1,2011110,phase 3: pattern loaded once per query
+bytes-L256-e0.2,bytes,256,0.2,pairs,rapidfuzz.cpdist,1,5000,327655168,pass,0,0.000000,0.010245,0.000080,5,488061.2,31.9832,2048.9,488055.2,233182,
+bytes-L256-e0.2,bytes,256,0.2,pairs,rapidfuzz.cpdist,all,5000,327655168,pass,0,0.000000,0.011943,0.001273,4,418665.9,27.4356,2388.5,418661.5,233182,
+bytes-L256-e0.2,bytes,256,0.2,pairs,rapidfuzz.distance-loop,1,5000,327655168,pass,0,0.000000,0.010541,0.000076,5,474343.5,31.0842,2108.2,474337.9,233182,one Python call per pair; measures call overhead
+bytes-L256-e0.2,bytes,256,0.2,pairs,stringzilla.1x1-loop,1,5000,327655168,pass,0,0.003316,0.018076,0.000115,3,276610.5,18.1266,3615.2,233729.5,233182,5.x has no pairwise API; one 1x1 matrix call per pair
+bytes-L256-e0.2,bytes,256,0.2,pairs,edlib.align-loop,1,5000,327655168,pass,0,0.000000,0.057569,0.000762,1,86852.4,5.6915,11513.8,86852.2,233182,one Python call per pair; edlib has no batch API
+bytes-L256-e0.2,bytes,256,0.2,pairs,ours.c-myers-plain,1,5000,327655168,pass,0,0.001141,0.008525,0.000050,6,586536.5,38.4363,1704.9,517301.9,233182,"phase 3: one pair at a time, no SIMD, one call per batch"
+bytes-L256-e0.2,bytes,256,0.2,cross,rapidfuzz.cdist,1,10000,654309890,pass,0,0.000000,0.019512,0.000095,3,512496.7,33.5332,1951.2,512492.3,2136347,
+bytes-L256-e0.2,bytes,256,0.2,cross,rapidfuzz.cdist,all,10000,654309890,pass,0,0.000000,0.020215,0.001361,3,494672.3,32.3669,2021.5,494669.3,2136347,
+bytes-L256-e0.2,bytes,256,0.2,cross,stringzilla.LevenshteinDistances,1,10000,654309890,pass,0,0.000004,0.019250,0.000049,3,519486.1,33.9905,1925.0,519376.0,2136347,
+bytes-L256-e0.2,bytes,256,0.2,cross,stringzilla.LevenshteinDistances,all,10000,654309890,pass,0,0.000005,0.005452,0.000270,9,1834327.9,120.0219,545.2,1832758.9,2136347,
+bytes-L256-e0.2,bytes,256,0.2,cross,edlib.align-loop,1,10000,654309890,pass,0,0.000000,0.139678,0.001877,1,71593.3,4.6844,13967.8,71593.3,2136347,nested Python loop
+bytes-L256-e0.2,bytes,256,0.2,cross,ours.c-myers-plain,1,10000,654309890,pass,0,0.000026,0.018018,0.000197,3,554990.3,36.3136,1801.8,554189.3,2136347,phase 3: pattern loaded once per query
