@@ -98,8 +98,23 @@ def contenders() -> tuple[list[Contender], list[str]]:
                       lambda st: cmyers.cross(*st),
                       note="phase 3: pattern loaded once per query"),
         ]
+        out.append(Contender("ours.c-myers-trim", "pairs", "1", both,
+                             lambda st: cmyers.pairs(*st, trim=True),
+                             note="phase 3b ablation: plain + common prefix/suffix trimming"))
     else:
         missing.append("ours.c-myers-plain (run `make`)")
+    if cmyers.ext_available():
+        ident = lambda A, B: (A, B)
+        out += [
+            Contender("ours.c-myers-ext", "pairs", "1", ident,
+                      lambda st: cmyers.ext_pairs(st[0], st[1], True),
+                      note="phase 3b: trim + reads Python str in place (no conversion)"),
+            Contender("ours.c-myers-ext", "cross", "1", ident,
+                      lambda st: cmyers.ext_cross(st[0], st[1]),
+                      note="phase 3b: reads Python str in place"),
+        ]
+    else:
+        missing.append("ours.c-myers-ext (run `make PY=<venv python>`)")
 
     return out, missing
 

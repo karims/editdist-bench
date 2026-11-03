@@ -44,7 +44,10 @@ rm -rf "$VENV"
 "$VENV/bin/python" -m pip install -q --upgrade pip
 "$VENV/bin/python" -m pip install -q -r requirements.txt
 
-# 4. Correctness before anything else.
+# 4. Build the C kernels and the CPython extension for this interpreter.
+make PY="$VENV/bin/python"
+
+# 5. Correctness before anything else.
 "$VENV/bin/python" -m pytest -q
 
 echo
