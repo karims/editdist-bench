@@ -1,0 +1,61 @@
+bucket,alphabet,length,error_rate,shape,contender,threads,n_pairs,cells,gate,mismatches_vs_consensus,prep_s,median_s,iqr_s,inner_repeats,pairs_per_s,gcups,ns_per_pair,checksum,note
+bytes-L16-e0.05,bytes,16,0.05,pairs,rapidfuzz.cpdist,1,5000,1278512,pass,0,0.000000,0.000223,0.000022,196,22455754.4,5.7420,44.5,5000,
+bytes-L16-e0.05,bytes,16,0.05,pairs,rapidfuzz.cpdist,all,5000,1278512,pass,0,0.000000,0.003403,0.000894,13,1469254.4,0.3757,680.6,5000,
+bytes-L16-e0.05,bytes,16,0.05,pairs,rapidfuzz.distance-loop,1,5000,1278512,pass,0,0.000000,0.000422,0.000008,120,11858234.8,3.0322,84.3,5000,one Python call per pair; measures call overhead
+bytes-L16-e0.05,bytes,16,0.05,pairs,stringzilla.1x1-loop,1,5000,1278512,pass,0,0.002783,0.002382,0.000065,22,2098716.0,0.5366,476.5,5000,5.x has no pairwise API; one 1x1 matrix call per pair
+bytes-L16-e0.05,bytes,16,0.05,pairs,edlib.align-loop,1,5000,1278512,pass,0,0.000202,0.005118,0.000129,10,976882.1,0.2498,1023.7,5000,one Python call per pair; edlib has no batch API
+bytes-L16-e0.05,bytes,16,0.05,cross,rapidfuzz.cdist,1,10000,2558400,pass,0,0.000020,0.000379,0.000002,129,26402820.2,6.7549,37.9,132980,
+bytes-L16-e0.05,bytes,16,0.05,cross,rapidfuzz.cdist,all,10000,2558400,pass,0,0.000000,0.000804,0.000909,106,12444637.5,3.1838,80.4,132980,
+bytes-L16-e0.05,bytes,16,0.05,cross,stringzilla.LevenshteinDistances,1,10000,2558400,pass,0,0.000005,0.000449,0.000004,111,22273949.5,5.6986,44.9,132980,
+bytes-L16-e0.05,bytes,16,0.05,cross,stringzilla.LevenshteinDistances,all,10000,2558400,pass,0,0.000006,0.000128,0.000007,356,78276452.8,20.0262,12.8,132980,
+bytes-L16-e0.05,bytes,16,0.05,cross,edlib.align-loop,1,10000,2558400,pass,0,0.000002,0.012907,0.000301,4,774787.8,0.1982,1290.7,132980,nested Python loop
+bytes-L16-e0.2,bytes,16,0.2,pairs,rapidfuzz.cpdist,1,5000,1278512,pass,0,0.000002,0.000386,0.000009,111,12951755.5,3.3118,77.2,14171,
+bytes-L16-e0.2,bytes,16,0.2,pairs,rapidfuzz.cpdist,all,5000,1278512,pass,0,0.000000,0.000888,0.000653,23,5633676.4,1.4405,177.5,14171,
+bytes-L16-e0.2,bytes,16,0.2,pairs,rapidfuzz.distance-loop,1,5000,1278512,pass,0,0.000000,0.000587,0.000047,87,8523743.3,2.1795,117.3,14171,one Python call per pair; measures call overhead
+bytes-L16-e0.2,bytes,16,0.2,pairs,stringzilla.1x1-loop,1,5000,1278512,pass,0,0.002680,0.002400,0.000017,21,2083240.3,0.5327,480.0,14171,5.x has no pairwise API; one 1x1 matrix call per pair
+bytes-L16-e0.2,bytes,16,0.2,pairs,edlib.align-loop,1,5000,1278512,pass,0,0.000206,0.005189,0.000365,10,963514.1,0.2464,1037.9,14171,one Python call per pair; edlib has no batch API
+bytes-L16-e0.2,bytes,16,0.2,cross,rapidfuzz.cdist,1,10000,2564790,pass,0,0.000027,0.000377,0.000004,133,26542491.4,6.8076,37.7,140101,
+bytes-L16-e0.2,bytes,16,0.2,cross,rapidfuzz.cdist,all,10000,2564790,pass,0,0.000000,0.001376,0.000672,11,7266381.4,1.8637,137.6,140101,
+bytes-L16-e0.2,bytes,16,0.2,cross,stringzilla.LevenshteinDistances,1,10000,2564790,pass,0,0.000005,0.000461,0.000002,103,21687673.2,5.5624,46.1,140101,
+bytes-L16-e0.2,bytes,16,0.2,cross,stringzilla.LevenshteinDistances,all,10000,2564790,pass,0,0.000011,0.000134,0.000007,336,74431793.0,19.0902,13.4,140101,
+bytes-L16-e0.2,bytes,16,0.2,cross,edlib.align-loop,1,10000,2564790,pass,0,0.000003,0.013499,0.000343,4,740793.3,0.1900,1349.9,140101,nested Python loop
+bytes-L64-e0.05,bytes,64,0.05,pairs,rapidfuzz.cpdist,1,5000,20473216,pass,0,0.000002,0.000758,0.000027,62,6599746.7,27.0236,151.5,14814,
+bytes-L64-e0.05,bytes,64,0.05,pairs,rapidfuzz.cpdist,all,5000,20473216,pass,0,0.000000,0.001537,0.000278,44,3253351.0,13.3213,307.4,14814,
+bytes-L64-e0.05,bytes,64,0.05,pairs,rapidfuzz.distance-loop,1,5000,20473216,pass,0,0.000001,0.000974,0.000014,52,5132199.3,21.0145,194.8,14814,one Python call per pair; measures call overhead
+bytes-L64-e0.05,bytes,64,0.05,pairs,stringzilla.1x1-loop,1,5000,20473216,pass,0,0.002687,0.005567,0.000153,9,898229.0,3.6779,1113.3,14814,5.x has no pairwise API; one 1x1 matrix call per pair
+bytes-L64-e0.05,bytes,64,0.05,pairs,edlib.align-loop,1,5000,20473216,pass,0,0.000197,0.013814,0.000289,4,361952.7,1.4821,2762.8,14814,one Python call per pair; edlib has no batch API
+bytes-L64-e0.05,bytes,64,0.05,cross,rapidfuzz.cdist,1,10000,41036260,pass,0,0.000045,0.002326,0.000020,22,4298998.6,17.6415,232.6,510651,
+bytes-L64-e0.05,bytes,64,0.05,cross,rapidfuzz.cdist,all,10000,41036260,pass,0,0.000001,0.003767,0.000629,11,2654864.6,10.8946,376.7,510651,
+bytes-L64-e0.05,bytes,64,0.05,cross,stringzilla.LevenshteinDistances,1,10000,41036260,pass,0,0.000005,0.002359,0.000111,21,4238186.1,17.3919,235.9,510651,
+bytes-L64-e0.05,bytes,64,0.05,cross,stringzilla.LevenshteinDistances,all,10000,41036260,pass,0,0.000007,0.000678,0.000053,71,14747756.1,60.5193,67.8,510651,
+bytes-L64-e0.05,bytes,64,0.05,cross,edlib.align-loop,1,10000,41036260,pass,0,0.000002,0.034879,0.003048,2,286702.2,1.1765,3487.9,510651,nested Python loop
+bytes-L64-e0.2,bytes,64,0.2,pairs,rapidfuzz.cpdist,1,5000,20476224,pass,0,0.000003,0.001093,0.000047,45,4575476.3,18.7377,218.6,59683,
+bytes-L64-e0.2,bytes,64,0.2,pairs,rapidfuzz.cpdist,all,5000,20476224,pass,0,0.000000,0.004479,0.001049,13,1116329.4,4.5716,895.8,59683,
+bytes-L64-e0.2,bytes,64,0.2,pairs,rapidfuzz.distance-loop,1,5000,20476224,pass,0,0.000001,0.001826,0.000597,26,2737882.0,11.2123,365.2,59683,one Python call per pair; measures call overhead
+bytes-L64-e0.2,bytes,64,0.2,pairs,stringzilla.1x1-loop,1,5000,20476224,pass,0,0.002925,0.006325,0.001555,8,790554.2,3.2375,1264.9,59683,5.x has no pairwise API; one 1x1 matrix call per pair
+bytes-L64-e0.2,bytes,64,0.2,pairs,edlib.align-loop,1,5000,20476224,pass,0,0.000237,0.014676,0.000474,4,340687.0,1.3952,2935.2,59683,one Python call per pair; edlib has no batch API
+bytes-L64-e0.2,bytes,64,0.2,cross,rapidfuzz.cdist,1,10000,40787340,pass,0,0.000034,0.002590,0.000093,20,3860342.5,15.7453,259.0,542972,
+bytes-L64-e0.2,bytes,64,0.2,cross,rapidfuzz.cdist,all,10000,40787340,pass,0,0.000001,0.003307,0.000361,9,3023664.4,12.3327,330.7,542972,
+bytes-L64-e0.2,bytes,64,0.2,cross,stringzilla.LevenshteinDistances,1,10000,40787340,pass,0,0.000008,0.003038,0.000378,14,3291923.0,13.4269,303.8,542972,
+bytes-L64-e0.2,bytes,64,0.2,cross,stringzilla.LevenshteinDistances,all,10000,40787340,pass,0,0.000020,0.000878,0.000083,48,11394895.4,46.4767,87.8,542972,
+bytes-L64-e0.2,bytes,64,0.2,cross,edlib.align-loop,1,10000,40787340,pass,0,0.000002,0.037963,0.029470,2,263411.5,1.0744,3796.3,542972,nested Python loop
+bytes-L256-e0.05,bytes,256,0.05,pairs,rapidfuzz.cpdist,1,5000,327748096,pass,0,0.000003,0.009343,0.000854,6,535163.2,35.0797,1868.6,63555,
+bytes-L256-e0.05,bytes,256,0.05,pairs,rapidfuzz.cpdist,all,5000,327748096,pass,0,0.000001,0.012977,0.007669,2,385302.0,25.2564,2595.4,63555,
+bytes-L256-e0.05,bytes,256,0.05,pairs,rapidfuzz.distance-loop,1,5000,327748096,pass,0,0.000001,0.009413,0.000626,6,531159.9,34.8173,1882.7,63555,one Python call per pair; measures call overhead
+bytes-L256-e0.05,bytes,256,0.05,pairs,stringzilla.1x1-loop,1,5000,327748096,pass,0,0.002996,0.018009,0.000232,3,277644.3,18.1995,3601.7,63555,5.x has no pairwise API; one 1x1 matrix call per pair
+bytes-L256-e0.05,bytes,256,0.05,pairs,edlib.align-loop,1,5000,327748096,pass,0,0.000636,0.058058,0.000507,1,86121.1,5.6452,11611.5,63555,one Python call per pair; edlib has no batch API
+bytes-L256-e0.05,bytes,256,0.05,cross,rapidfuzz.cdist,1,10000,655129410,pass,0,0.000041,0.019772,0.001603,3,505762.2,33.1340,1977.2,2011110,
+bytes-L256-e0.05,bytes,256,0.05,cross,rapidfuzz.cdist,all,10000,655129410,pass,0,0.000001,0.019043,0.002822,3,525131.9,34.4029,1904.3,2011110,
+bytes-L256-e0.05,bytes,256,0.05,cross,stringzilla.LevenshteinDistances,1,10000,655129410,pass,0,0.000009,0.019075,0.000379,3,524236.1,34.3442,1907.5,2011110,
+bytes-L256-e0.05,bytes,256,0.05,cross,stringzilla.LevenshteinDistances,all,10000,655129410,pass,0,0.000018,0.005225,0.000233,9,1913721.3,125.3735,522.5,2011110,
+bytes-L256-e0.05,bytes,256,0.05,cross,edlib.align-loop,1,10000,655129410,pass,0,0.000004,0.136279,0.002175,1,73379.1,4.8073,13627.9,2011110,nested Python loop
+bytes-L256-e0.2,bytes,256,0.2,pairs,rapidfuzz.cpdist,1,5000,327655168,pass,0,0.000003,0.010324,0.004040,5,484286.9,31.7358,2064.9,233182,
+bytes-L256-e0.2,bytes,256,0.2,pairs,rapidfuzz.cpdist,all,5000,327655168,pass,0,0.000000,0.012003,0.001733,4,416566.1,27.2980,2400.6,233182,
+bytes-L256-e0.2,bytes,256,0.2,pairs,rapidfuzz.distance-loop,1,5000,327655168,pass,0,0.000001,0.010489,0.000072,5,476696.7,31.2384,2097.8,233182,one Python call per pair; measures call overhead
+bytes-L256-e0.2,bytes,256,0.2,pairs,stringzilla.1x1-loop,1,5000,327655168,pass,0,0.002705,0.018150,0.000726,3,275476.4,18.0523,3630.1,233182,5.x has no pairwise API; one 1x1 matrix call per pair
+bytes-L256-e0.2,bytes,256,0.2,pairs,edlib.align-loop,1,5000,327655168,pass,0,0.000875,0.061692,0.007668,1,81048.2,5.3112,12338.3,233182,one Python call per pair; edlib has no batch API
+bytes-L256-e0.2,bytes,256,0.2,cross,rapidfuzz.cdist,1,10000,654309890,pass,0,0.000047,0.019572,0.000773,3,510944.9,33.4316,1957.2,2136347,
+bytes-L256-e0.2,bytes,256,0.2,cross,rapidfuzz.cdist,all,10000,654309890,pass,0,0.000001,0.020286,0.001837,3,492956.9,32.2547,2028.6,2136347,
+bytes-L256-e0.2,bytes,256,0.2,cross,stringzilla.LevenshteinDistances,1,10000,654309890,pass,0,0.000011,0.019843,0.000089,3,503960.3,32.9746,1984.3,2136347,
+bytes-L256-e0.2,bytes,256,0.2,cross,stringzilla.LevenshteinDistances,all,10000,654309890,pass,0,0.000018,0.005611,0.000392,9,1782215.0,116.6121,561.1,2136347,
+bytes-L256-e0.2,bytes,256,0.2,cross,edlib.align-loop,1,10000,654309890,pass,0,0.000002,0.138476,0.007023,1,72214.9,4.7251,13847.6,2136347,nested Python loop
