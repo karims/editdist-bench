@@ -36,7 +36,9 @@ class Bucket:
 
     @property
     def edits(self) -> int:
-        return round(self.error_rate * self.length)
+        # At least one edit: otherwise short low-error buckets (e.g. L16 at 1%)
+        # contain only identical pairs and measure duplicate detection instead.
+        return max(1, round(self.error_rate * self.length))
 
 
 def grid(quick: bool = False) -> list[Bucket]:
