@@ -1,0 +1,45 @@
+bucket,alphabet,length,error_rate,shape,contender,threads,n_pairs,cells,gate,mismatches_vs_consensus,prep_s,median_s,iqr_s,inner_repeats,pairs_per_s,gcups,ns_per_pair,e2e_pairs_per_s,checksum,note
+bytes-L16-e0.05,bytes,16,0.05,pairs,rapidfuzz.cpdist,1,10000,2558656,pass,0,0.000000,0.000499,0.000002,78,20042997.9,5.1283,49.9,20037977.6,10000,
+bytes-L16-e0.05,bytes,16,0.05,pairs,rapidfuzz.cpdist,all,10000,2558656,pass,0,0.000000,0.001442,0.000377,30,6936429.5,1.7748,144.2,6936025.4,10000,
+bytes-L16-e0.05,bytes,16,0.05,pairs,rapidfuzz.distance-loop,1,10000,2558656,pass,0,0.000000,0.000826,0.000001,62,12108409.2,3.0981,82.6,12107177.7,10000,one Python call per pair; measures call overhead
+bytes-L16-e0.05,bytes,16,0.05,pairs,stringzilla.1x1-loop,1,10000,2558656,pass,0,0.005935,0.004553,0.000034,11,2196193.3,0.5619,455.3,953444.1,10000,5.x has no pairwise API; one 1x1 matrix call per pair
+bytes-L16-e0.05,bytes,16,0.05,pairs,edlib.align-loop,1,10000,2558656,pass,0,0.000000,0.009849,0.000872,6,1015300.7,0.2598,984.9,1015287.8,10000,one Python call per pair; edlib has no batch API
+bytes-L16-e0.05,bytes,16,0.05,pairs,ours.c-myers-plain,1,10000,2558656,pass,0,0.001462,0.000478,0.000004,103,20912343.4,5.3507,47.8,5154364.2,10000,"phase 3: one pair at a time, no SIMD, one call per batch"
+bytes-L16-e0.05,bytes,16,0.05,pairs,ours.c-myers-neon-pairs-k1,1,10000,2558656,pass,0,0.001451,0.000193,0.000001,196,51706570.1,13.2299,19.3,6080631.5,10000,"phase 4.2: trim + NEON lanes per pair, K=1"
+bytes-L16-e0.05,bytes,16,0.05,pairs,ours.c-myers-neon-pairs-k4,1,10000,2558656,pass,0,0.001445,0.000184,0.000001,244,54318587.0,13.8983,18.4,6137891.2,10000,"phase 4.2: trim + NEON lanes per pair, K=4"
+bytes-L16-e0.05,bytes,16,0.05,pairs,ours.c-myers-trim,1,10000,2558656,pass,0,0.001453,0.000132,0.000002,260,75808563.2,19.3968,13.2,6309171.3,10000,phase 3b ablation: plain + common prefix/suffix trimming
+bytes-L16-e0.05,bytes,16,0.05,pairs,ours.c-myers-ext,1,10000,2558656,pass,0,0.000000,0.000153,0.000001,211,65158902.0,16.6719,15.3,65123257.8,10000,phase 3b: trim + reads Python str in place (no conversion)
+bytes-L16-e0.05,bytes,16,0.05,pairs,ours.c-myers-ext-neon,1,10000,2558656,pass,0,0.000000,0.000230,0.000001,179,43558493.4,11.1451,23.0,43542561.5,10000,"phase 4.2: in-place str + trim + NEON pairs, K=4"
+bytes-L16-e0.2,bytes,16,0.2,pairs,rapidfuzz.cpdist,1,10000,2558512,pass,0,0.000000,0.000721,0.000009,66,13869856.4,3.5486,72.1,13867452.1,28398,
+bytes-L16-e0.2,bytes,16,0.2,pairs,rapidfuzz.cpdist,all,10000,2558512,pass,0,0.000000,0.001496,0.000321,64,6685318.3,1.7104,149.6,6684759.7,28398,
+bytes-L16-e0.2,bytes,16,0.2,pairs,rapidfuzz.distance-loop,1,10000,2558512,pass,0,0.000000,0.001179,0.000061,41,8481464.5,2.1700,117.9,8480565.4,28398,one Python call per pair; measures call overhead
+bytes-L16-e0.2,bytes,16,0.2,pairs,stringzilla.1x1-loop,1,10000,2558512,pass,0,0.005652,0.004608,0.000034,11,2169985.5,0.5552,460.8,974655.7,28398,5.x has no pairwise API; one 1x1 matrix call per pair
+bytes-L16-e0.2,bytes,16,0.2,pairs,edlib.align-loop,1,10000,2558512,pass,0,0.000000,0.010243,0.000198,5,976292.4,0.2498,1024.3,976280.4,28398,one Python call per pair; edlib has no batch API
+bytes-L16-e0.2,bytes,16,0.2,pairs,ours.c-myers-plain,1,10000,2558512,pass,0,0.001469,0.000493,0.000002,100,20293117.4,5.1920,49.3,5098282.4,28398,"phase 3: one pair at a time, no SIMD, one call per batch"
+bytes-L16-e0.2,bytes,16,0.2,pairs,ours.c-myers-neon-pairs-k1,1,10000,2558512,pass,0,0.001474,0.001085,0.000018,40,9214670.1,2.3576,108.5,3907750.4,28398,"phase 4.2: trim + NEON lanes per pair, K=1"
+bytes-L16-e0.2,bytes,16,0.2,pairs,ours.c-myers-neon-pairs-k4,1,10000,2558512,pass,0,0.001447,0.001069,0.000072,46,9355187.0,2.3935,106.9,3974218.9,28398,"phase 4.2: trim + NEON lanes per pair, K=4"
+bytes-L16-e0.2,bytes,16,0.2,pairs,ours.c-myers-trim,1,10000,2558512,pass,0,0.001455,0.000338,0.000003,111,29570626.5,7.5657,33.8,5577483.0,28398,phase 3b ablation: plain + common prefix/suffix trimming
+bytes-L16-e0.2,bytes,16,0.2,pairs,ours.c-myers-ext,1,10000,2558512,pass,0,0.000000,0.000337,0.000003,100,29647235.3,7.5853,33.7,29636252.3,28398,phase 3b: trim + reads Python str in place (no conversion)
+bytes-L16-e0.2,bytes,16,0.2,pairs,ours.c-myers-ext-neon,1,10000,2558512,pass,0,0.000000,0.001087,0.000019,41,9197809.0,2.3533,108.7,9196751.7,28398,"phase 4.2: in-place str + trim + NEON pairs, K=4"
+bytes-L32-e0.05,bytes,32,0.05,pairs,rapidfuzz.cpdist,1,10000,10239648,pass,0,0.000000,0.000871,0.000004,55,11485801.4,11.7611,87.1,11483611.9,19731,
+bytes-L32-e0.05,bytes,32,0.05,pairs,rapidfuzz.cpdist,all,10000,10239648,pass,0,0.000000,0.001283,0.000342,46,7796902.0,7.9838,128.3,7796397.4,19731,
+bytes-L32-e0.05,bytes,32,0.05,pairs,rapidfuzz.distance-loop,1,10000,10239648,pass,0,0.000000,0.001274,0.000004,40,7847516.2,8.0356,127.4,7846746.5,19731,one Python call per pair; measures call overhead
+bytes-L32-e0.05,bytes,32,0.05,pairs,stringzilla.1x1-loop,1,10000,10239648,pass,0,0.005719,0.006912,0.000343,8,1446859.6,1.4815,691.2,791761.7,19731,5.x has no pairwise API; one 1x1 matrix call per pair
+bytes-L32-e0.05,bytes,32,0.05,pairs,edlib.align-loop,1,10000,10239648,pass,0,0.000000,0.016573,0.003269,4,603382.0,0.6178,1657.3,603377.4,19731,one Python call per pair; edlib has no batch API
+bytes-L32-e0.05,bytes,32,0.05,pairs,ours.c-myers-plain,1,10000,10239648,pass,0,0.001500,0.001027,0.000042,49,9737985.2,9.9714,102.7,3957080.8,19731,"phase 3: one pair at a time, no SIMD, one call per batch"
+bytes-L32-e0.05,bytes,32,0.05,pairs,ours.c-myers-neon-pairs-k1,1,10000,10239648,pass,0,0.001476,0.001272,0.000052,37,7862811.7,8.0512,127.2,3639593.4,19731,"phase 4.2: trim + NEON lanes per pair, K=1"
+bytes-L32-e0.05,bytes,32,0.05,pairs,ours.c-myers-neon-pairs-k4,1,10000,10239648,pass,0,0.001458,0.001306,0.000013,38,7654320.1,7.8378,130.6,3616809.5,19731,"phase 4.2: trim + NEON lanes per pair, K=4"
+bytes-L32-e0.05,bytes,32,0.05,pairs,ours.c-myers-trim,1,10000,10239648,pass,0,0.001446,0.000506,0.000013,86,19770626.3,20.2444,50.6,5123583.7,19731,phase 3b ablation: plain + common prefix/suffix trimming
+bytes-L32-e0.05,bytes,32,0.05,pairs,ours.c-myers-ext,1,10000,10239648,pass,0,0.000000,0.000523,0.000025,56,19115454.9,19.5736,52.3,19110888.4,19731,phase 3b: trim + reads Python str in place (no conversion)
+bytes-L32-e0.05,bytes,32,0.05,pairs,ours.c-myers-ext-neon,1,10000,10239648,pass,0,0.000000,0.001315,0.000041,36,7602749.3,7.7849,131.5,7602263.8,19731,"phase 4.2: in-place str + trim + NEON pairs, K=4"
+bytes-L32-e0.2,bytes,32,0.2,pairs,rapidfuzz.cpdist,1,10000,10246912,pass,0,0.000000,0.001168,0.000002,42,8560247.8,8.7716,116.8,8559024.3,55828,
+bytes-L32-e0.2,bytes,32,0.2,pairs,rapidfuzz.cpdist,all,10000,10246912,pass,0,0.000000,0.001897,0.000297,40,5270997.9,5.4011,189.7,5270650.7,55828,
+bytes-L32-e0.2,bytes,32,0.2,pairs,rapidfuzz.distance-loop,1,10000,10246912,pass,0,0.000000,0.001588,0.000005,32,6296258.6,6.4517,158.8,6295929.5,55828,one Python call per pair; measures call overhead
+bytes-L32-e0.2,bytes,32,0.2,pairs,stringzilla.1x1-loop,1,10000,10246912,pass,0,0.005638,0.006835,0.000509,8,1462959.7,1.4991,683.5,801721.0,55828,5.x has no pairwise API; one 1x1 matrix call per pair
+bytes-L32-e0.2,bytes,32,0.2,pairs,edlib.align-loop,1,10000,10246912,pass,0,0.000000,0.016131,0.000599,4,619921.2,0.6352,1613.1,619916.4,55828,one Python call per pair; edlib has no batch API
+bytes-L32-e0.2,bytes,32,0.2,pairs,ours.c-myers-plain,1,10000,10246912,pass,0,0.001481,0.001034,0.000010,48,9672820.3,9.9117,103.4,3976947.0,55828,"phase 3: one pair at a time, no SIMD, one call per batch"
+bytes-L32-e0.2,bytes,32,0.2,pairs,ours.c-myers-neon-pairs-k1,1,10000,10246912,pass,0,0.001465,0.001925,0.000082,25,5194994.1,5.3233,192.5,2950275.5,55828,"phase 4.2: trim + NEON lanes per pair, K=1"
+bytes-L32-e0.2,bytes,32,0.2,pairs,ours.c-myers-neon-pairs-k4,1,10000,10246912,pass,0,0.001444,0.002056,0.000019,24,4862996.1,4.9831,205.6,2856656.9,55828,"phase 4.2: trim + NEON lanes per pair, K=4"
+bytes-L32-e0.2,bytes,32,0.2,pairs,ours.c-myers-trim,1,10000,10246912,pass,0,0.001441,0.000876,0.000003,53,11411254.6,11.6930,87.6,4315238.8,55828,phase 3b ablation: plain + common prefix/suffix trimming
+bytes-L32-e0.2,bytes,32,0.2,pairs,ours.c-myers-ext,1,10000,10246912,pass,0,0.000000,0.000886,0.000003,51,11280367.7,11.5589,88.6,11278777.4,55828,phase 3b: trim + reads Python str in place (no conversion)
+bytes-L32-e0.2,bytes,32,0.2,pairs,ours.c-myers-ext-neon,1,10000,10246912,pass,0,0.000000,0.002099,0.000078,23,4765156.3,4.8828,209.9,4764872.5,55828,"phase 4.2: in-place str + trim + NEON pairs, K=4"

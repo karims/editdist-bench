@@ -409,7 +409,20 @@ static int cmp_lt_desc(const void *x, const void *y) {
 #if defined(__ARM_NEON)
 static const uint8_t ZERO_BYTE = 0;
 
-#define DEFINE_PAIRS_KERNEL(NAME, VT, ET, LANES, K, DUP, LD, ST, AND, ORR, EOR, ADD, SUB, SHL1, TST, CLT) \
+/* Gather one Peq word per lane straight into a register. Finished lanes
+ * (j >= text length) read row 0; their score is frozen by the active mask. */
+#define PEQ(G, L) table[G][(j < (int)nlen[G][L]) ? tp[G][L][j] : 0][L]
+#define GATHER_16(G) ({ uint16x8_t v_ = vdupq_n_u16(PEQ(G, 0));                       \
+    v_ = vsetq_lane_u16(PEQ(G, 1), v_, 1); v_ = vsetq_lane_u16(PEQ(G, 2), v_, 2);     \
+    v_ = vsetq_lane_u16(PEQ(G, 3), v_, 3); v_ = vsetq_lane_u16(PEQ(G, 4), v_, 4);     \
+    v_ = vsetq_lane_u16(PEQ(G, 5), v_, 5); v_ = vsetq_lane_u16(PEQ(G, 6), v_, 6);     \
+    v_ = vsetq_lane_u16(PEQ(G, 7), v_, 7); v_; })
+#define GATHER_32(G) ({ uint32x4_t v_ = vdupq_n_u32(PEQ(G, 0));                       \
+    v_ = vsetq_lane_u32(PEQ(G, 1), v_, 1); v_ = vsetq_lane_u32(PEQ(G, 2), v_, 2);     \
+    v_ = vsetq_lane_u32(PEQ(G, 3), v_, 3); v_; })
+#define GATHER_64(G) vcombine_u64(vcreate_u64(PEQ(G, 0)), vcreate_u64(PEQ(G, 1)))
+
+#define DEFINE_PAIRS_KERNEL(NAME, VT, ET, LANES, K, DUP, LD, ST, AND, ORR, EOR, ADD, SUB, SHL1, TST, CLT, GATHER) \
 static void NAME(const pair_t *pr, int cnt, int32_t *out) {                                       \
     static _Thread_local ET table[K][256][LANES];   /* zero; cleared after each use */            \
     ET last[K][LANES], m0[K][LANES], nlen[K][LANES];                                               \
@@ -433,13 +446,10 @@ static void NAME(const pair_t *pr, int cnt, int32_t *out) {                     
         L[g] = LD(last[g]); NL[g] = LD(nlen[g]); score[g] = LD(m0[g]);                             \
         Pv[g] = ones; Mv[g] = DUP((ET)0);                                                          \
     }                                                                                              \
-    ET e[LANES];                                                                                   \
     for (int j = 0; j < maxn; j++) {                                                               \
         const VT J = DUP((ET)j);                                                                   \
         for (int g = 0; g < K; g++) {                                                              \
-            for (int l = 0; l < LANES; l++)                                                        \
-                e[l] = table[g][(j < (int)nlen[g][l]) ? tp[g][l][j] : 0][l];                       \
-            VT Eq = LD(e);                                                                         \
+            VT Eq = GATHER(g);                                                                     \
             VT act = CLT(J, NL[g]);                                                                \
             VT Xv = ORR(Eq, Mv[g]);                                                                \
             VT Xh = ORR(EOR(ADD(AND(Eq, Pv[g]), Pv[g]), Pv[g]), Eq);                               \
@@ -467,7 +477,7 @@ static void NAME(const pair_t *pr, int cnt, int32_t *out) {                     
 #define PINST(W, VT, ET, LANES, K) \
     DEFINE_PAIRS_KERNEL(pairs##W##_k##K, VT, ET, LANES, K, vdupq_n_u##W, vld1q_u##W, vst1q_u##W, \
                         vandq_u##W, vorrq_u##W, veorq_u##W, vaddq_u##W, vsubq_u##W, SHL1_##W,    \
-                        vtstq_u##W, vcltq_u##W)
+                        vtstq_u##W, vcltq_u##W, GATHER_##W)
 PINST(16, uint16x8_t, uint16_t, 8, 1)
 PINST(16, uint16x8_t, uint16_t, 8, 2)
 PINST(16, uint16x8_t, uint16_t, 8, 4)
