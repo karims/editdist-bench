@@ -98,6 +98,10 @@ def contenders() -> tuple[list[Contender], list[str]]:
                       lambda st: cmyers.cross(*st),
                       note="phase 3: pattern loaded once per query"),
         ]
+        if cmyers.simd_available():
+            out.append(Contender("ours.c-myers-neon", "cross", "1", both,
+                                 lambda st: cmyers.cross_simd(*st),
+                                 note="phase 4: candidates packed 8/4/2 per NEON register"))
         out.append(Contender("ours.c-myers-trim", "pairs", "1", both,
                              lambda st: cmyers.pairs(*st, trim=True),
                              note="phase 3b ablation: plain + common prefix/suffix trimming"))
