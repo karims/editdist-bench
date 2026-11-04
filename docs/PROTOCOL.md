@@ -87,6 +87,33 @@ The `--quick` grid is L ∈ {16, 64, 256}, error ∈ {0.05, 0.20}, alphabet `byt
   (CPU, cores, OS, Python, library versions, git commit) saved with every CSV.
 - Raw CSVs are committed to `results/` and never edited by hand.
 
+**Amendment (after the first native macOS runs, which showed a timing spread
+of 14-19% of the median):**
+
+- Within a bucket, contenders are timed **interleaved**: each of the `--reps`
+  rounds times every contender once, in a freshly shuffled (seeded) order,
+  preceded by one untimed call to re-warm caches. A burst of background load
+  therefore spreads across contenders instead of biasing one.
+- Single-threaded contenders also record **thread CPU time** (`cpu_median_s`,
+  `cpu_pairs_per_s`). `wall_over_cpu` > 1 means the OS ran something else on
+  that core during the sample. Wall time stays the headline metric; CPU time
+  is the cross-check.
+- Machine state (load average, other processes' CPU, top processes, power,
+  thermal limit) is recorded before and after each run (`sysload_before`,
+  `sysload_after` in the environment JSON).
+- On macOS the timing thread requests user-interactive QoS so it stays on
+  performance cores (`thread_qos`). macOS has no core pinning, so this is the
+  closest available control.
+
+### 6.1 Official runs
+
+Results used for claims come from `scripts/official_run.sh`, which: refuses
+uncommitted changes; shows a checklist (power, other apps, indexing); waits
+until other processes use < 25% of one core; prevents sleep; and runs with
+`--strict --reps 11`. `--strict` refuses to start on battery, when throttled,
+or when the machine is busy. A row is reported with its IQR; rows whose
+IQR/median exceeds 5% are flagged as noisy in write-ups.
+
 ## 7. Reporting rules
 
 - Report every bucket, including ones where we lose.
