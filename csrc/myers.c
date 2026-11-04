@@ -239,13 +239,83 @@ DEFINE_GROUP_KERNEL(group32, uint32x4_t, uint32_t, 4, vdupq_n_u32, vld1q_u32, vs
                     vandq_u32, vorrq_u32, veorq_u32, vaddq_u32, vsubq_u32, SHL1_32, vtstq_u32)
 DEFINE_GROUP_KERNEL(group64, uint64x2_t, uint64_t, 2, vdupq_n_u64, vld1q_u64, vst1q_u64,
                     vandq_u64, vorrq_u64, veorq_u64, vaddq_u64, vsubq_u64, SHL1_64, vtstq_u64)
+
+/* K independent register groups per query scan. One Myers step depends on the
+ * previous one, so a single group is latency-bound; K groups give the core K
+ * independent dependency chains to overlap. Unused lanes/groups compute
+ * garbage that is never written out. */
+#define DEFINE_KGROUP_KERNEL(NAME, VT, ET, LANES, K, DUP, LD, ST, AND, ORR, EOR, ADD, SUB, SHL1, TST) \
+static void NAME(const uint8_t *buf_q, const int64_t *off_q, int64_t nq,                          \
+                 const uint8_t *buf_c, const int64_t *off_c, int64_t nc,                          \
+                 const int64_t *idx, int cnt, int32_t *out) {                                      \
+    static _Thread_local ET table[K][256][LANES];                                                  \
+    ET last[K][LANES], m0[K][LANES];                                                               \
+    memset(table, 0, sizeof(table));                                                               \
+    for (int g = 0; g < K; g++)                                                                    \
+        for (int l = 0; l < LANES; l++) {                                                          \
+            int s = g * LANES + l;                                                                 \
+            last[g][l] = 0; m0[g][l] = 0;                                                          \
+            if (s >= cnt) continue;                                                                \
+            const uint8_t *c = buf_c + off_c[idx[s]];                                              \
+            int m = (int)(off_c[idx[s] + 1] - off_c[idx[s]]);                                      \
+            for (int i = 0; i < m; i++) table[g][c[i]][l] |= (ET)((ET)1 << i);                     \
+            last[g][l] = (ET)((ET)1 << (m - 1));                                                   \
+            m0[g][l] = (ET)m;                                                                      \
+        }                                                                                          \
+    const VT ones = DUP((ET)~(ET)0), one = DUP((ET)1);                                             \
+    VT L[K], M0[K];                                                                                \
+    for (int g = 0; g < K; g++) { L[g] = LD(last[g]); M0[g] = LD(m0[g]); }                         \
+    ET res[LANES];                                                                                 \
+    for (int64_t q = 0; q < nq; q++) {                                                             \
+        const uint8_t *t = buf_q + off_q[q];                                                       \
+        int64_t n = off_q[q + 1] - off_q[q];                                                       \
+        VT Pv[K], Mv[K], score[K];                                                                 \
+        for (int g = 0; g < K; g++) { Pv[g] = ones; Mv[g] = DUP((ET)0); score[g] = M0[g]; }        \
+        for (int64_t j = 0; j < n; j++) {                                                          \
+            const uint8_t c = t[j];                                                                \
+            for (int g = 0; g < K; g++) {                                                          \
+                VT Eq = LD(table[g][c]);                                                           \
+                VT Xv = ORR(Eq, Mv[g]);                                                            \
+                VT Xh = ORR(EOR(ADD(AND(Eq, Pv[g]), Pv[g]), Pv[g]), Eq);                           \
+                VT Ph = ORR(Mv[g], EOR(ORR(Xh, Pv[g]), ones));                                     \
+                VT Mh = AND(Pv[g], Xh);                                                            \
+                score[g] = ADD(SUB(score[g], TST(Ph, L[g])), TST(Mh, L[g]));                       \
+                Ph = ORR(SHL1(Ph), one);                                                           \
+                Mh = SHL1(Mh);                                                                     \
+                Pv[g] = ORR(Mh, EOR(ORR(Xv, Ph), ones));                                           \
+                Mv[g] = AND(Ph, Xv);                                                               \
+            }                                                                                      \
+        }                                                                                          \
+        for (int g = 0; g < K; g++) {                                                              \
+            ST(res, score[g]);                                                                     \
+            for (int l = 0; l < LANES; l++) {                                                      \
+                int s = g * LANES + l;                                                             \
+                if (s >= cnt) break;                                                               \
+                out[q * nc + idx[s]] = (m0[g][l] == 0) ? (int32_t)n : (int32_t)res[l];             \
+            }                                                                                      \
+        }                                                                                          \
+    }                                                                                              \
+}
+
+#define KINST(W, VT, ET, LANES, K) \
+    DEFINE_KGROUP_KERNEL(group##W##_k##K, VT, ET, LANES, K, vdupq_n_u##W, vld1q_u##W, vst1q_u##W, \
+                         vandq_u##W, vorrq_u##W, veorq_u##W, vaddq_u##W, vsubq_u##W, SHL1_##W, vtstq_u##W)
+KINST(16, uint16x8_t, uint16_t, 8, 2)
+KINST(16, uint16x8_t, uint16_t, 8, 4)
+KINST(32, uint32x4_t, uint32_t, 4, 2)
+KINST(32, uint32x4_t, uint32_t, 4, 4)
+KINST(64, uint64x2_t, uint64_t, 2, 2)
+KINST(64, uint64x2_t, uint64_t, 2, 4)
 #endif
 
-/* Same contract as ed_cross. Returns 0, or -1 on allocation failure. */
-int ed_cross_simd(const uint8_t *buf_q, const int64_t *off_q, int64_t nq,
-                  const uint8_t *buf_c, const int64_t *off_c, int64_t nc,
-                  int32_t *out) {
+/* Same contract as ed_cross; k = number of interleaved register groups
+ * (1, 2 or 4). Returns 0, -1 on allocation failure, -2 for an invalid k. */
+int ed_cross_simd_k(const uint8_t *buf_q, const int64_t *off_q, int64_t nq,
+                    const uint8_t *buf_c, const int64_t *off_c, int64_t nc,
+                    int32_t *out, int k) {
+    if (k != 1 && k != 2 && k != 4) return -2;
 #if !defined(__ARM_NEON)
+    (void)k;
     return ed_cross(buf_q, off_q, nq, buf_c, off_c, nc, out);
 #else
     int64_t maxq = 0;
@@ -267,12 +337,20 @@ int ed_cross_simd(const uint8_t *buf_q, const int64_t *off_q, int64_t nq,
         int k = (m <= 16 && allow16) ? 0 : (m <= 32 ? 1 : (m <= 64 ? 2 : 3));
         cls[k][cnt[k]++] = j;
     }
-    for (int64_t g = 0; g < cnt[0]; g += 8)
-        group16(buf_q, off_q, nq, buf_c, off_c, nc, cls[0] + g, (int)(cnt[0] - g < 8 ? cnt[0] - g : 8), out);
-    for (int64_t g = 0; g < cnt[1]; g += 4)
-        group32(buf_q, off_q, nq, buf_c, off_c, nc, cls[1] + g, (int)(cnt[1] - g < 4 ? cnt[1] - g : 4), out);
-    for (int64_t g = 0; g < cnt[2]; g += 2)
-        group64(buf_q, off_q, nq, buf_c, off_c, nc, cls[2] + g, (int)(cnt[2] - g < 2 ? cnt[2] - g : 2), out);
+#define RUN_CLASS(CLS, LANES, F1, F2, F4)                                                     \
+    for (int64_t g = 0; g < cnt[CLS];) {                                                          \
+        int64_t left = cnt[CLS] - g;                                                              \
+        int kk = (k >= 4 && left > 2 * LANES) ? 4 : (k >= 2 && left > LANES) ? 2 : 1;             \
+        int take = (int)(left < (int64_t)kk * LANES ? left : (int64_t)kk * LANES);                \
+        if (kk == 4) F4(buf_q, off_q, nq, buf_c, off_c, nc, cls[CLS] + g, take, out);             \
+        else if (kk == 2) F2(buf_q, off_q, nq, buf_c, off_c, nc, cls[CLS] + g, take, out);        \
+        else F1(buf_q, off_q, nq, buf_c, off_c, nc, cls[CLS] + g, take, out);                     \
+        g += take;                                                                                \
+    }
+    RUN_CLASS(0, 8, group16, group16_k2, group16_k4)
+    RUN_CLASS(1, 4, group32, group32_k2, group32_k4)
+    RUN_CLASS(2, 2, group64, group64_k2, group64_k4)
+#undef RUN_CLASS
 
     int rc = 0;
     if (cnt[3]) {   /* long candidates: scalar, candidate as pattern, loaded once */
@@ -303,4 +381,10 @@ int ed_cross_simd(const uint8_t *buf_q, const int64_t *off_q, int64_t nq,
     for (int k = 0; k < 4; k++) free(cls[k]);
     return rc;
 #endif
+}
+
+int ed_cross_simd(const uint8_t *buf_q, const int64_t *off_q, int64_t nq,
+                  const uint8_t *buf_c, const int64_t *off_c, int64_t nc,
+                  int32_t *out) {
+    return ed_cross_simd_k(buf_q, off_q, nq, buf_c, off_c, nc, out, 1);
 }

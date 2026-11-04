@@ -32,6 +32,8 @@ def _lib():
     lib.ed_cross.restype = ctypes.c_int
     lib.ed_cross_simd.argtypes = lib.ed_cross.argtypes
     lib.ed_cross_simd.restype = ctypes.c_int
+    lib.ed_cross_simd_k.argtypes = lib.ed_cross.argtypes + [ctypes.c_int]
+    lib.ed_cross_simd_k.restype = ctypes.c_int
     lib.ed_simd_available.argtypes = []
     lib.ed_simd_available.restype = ctypes.c_int
     return lib
@@ -78,12 +80,16 @@ def simd_available() -> bool:
     return available() and bool(lib().ed_simd_available())
 
 
-def cross_simd(packed_q, packed_c) -> np.ndarray:
-    """Phase 4: NEON inter-pair kernel (falls back to scalar without NEON)."""
+def cross_simd(packed_q, packed_c, k: int = 1) -> np.ndarray:
+    """Phase 4: NEON inter-pair kernel (falls back to scalar without NEON).
+    k = number of independent register groups interleaved (1, 2 or 4)."""
     (bq, oq), (bc, oc) = packed_q, packed_c
     nq, nc = len(oq) - 1, len(oc) - 1
     out = np.empty((nq, nc), dtype=np.int32)
-    if lib().ed_cross_simd(bq, oq, nq, bc, oc, nc, out) != 0:
+    rc = lib().ed_cross_simd_k(bq, oq, nq, bc, oc, nc, out, int(k))
+    if rc == -2:
+        raise ValueError("k must be 1, 2 or 4")
+    if rc != 0:
         raise MemoryError("ed_cross_simd allocation failed")
     return out
 
