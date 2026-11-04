@@ -109,3 +109,19 @@ registration was not yet committed when the run started).
 - NEON gains are far below lane count (4.2x with 8 lanes, 1.05x with 2).
   Likely cause: each Myers step depends on the previous one, so one register
   group is latency-bound. Next: interleave several independent groups.
+
+### Phase 4 step 1 — interleaving independent groups (VM, preliminary)
+
+Source: `results/vm-linux/prior_art_20261104-035621.csv` (bytes, 200 x 200,
+single thread, kernel-only, cross shape).
+
+| Length | Best library | NEON K=1 | K=2 | K=4 | K=4 / library |
+|---|---|---|---|---|---|
+| 16 | 26.9M | 122M | 155-158M | 202-207M | 7.5-7.7x |
+| 32 | 12.4-12.5M | 23-24M | 36-38M | 56-58M | 4.5-4.6x |
+| 64 | 3.9-4.6M | 6.0-6.1M | 7.8-8.0M | 9.1-9.5M | 2.0-2.3x |
+
+The latency explanation holds: K=4 is 1.5-2.4x over K=1 at every length, so
+one register group was waiting on its own dependency chain. With K=4, **H4.1
+now holds for the cross shape at every L <= 64** (>= 2x over the best library
+on this platform). Same caveat as before: RapidFuzz has no SIMD path on ARM.
