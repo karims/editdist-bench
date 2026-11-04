@@ -181,3 +181,38 @@ all runs. Ranges span the runs.
   is ~2x RapidFuzz. At L16 it is roughly level with scalar + trim. The VM's
   slower per-lane gathers made it look worse than it is.
 - Caveat unchanged: RapidFuzz has no SIMD path on ARM.
+
+### Native macOS (Apple M4) — full grid, official run 1 of 2
+
+Source: `results/macos-m4/prior_art_20261104-103035` (official script,
+20,000 pairs, 200 x 200 cross, 11 interleaved reps). 1,260 rows, all gates
+pass, 0 mismatches. Ratios = best of ours / best library, single thread.
+Median row IQR/median 9.4%. Needs a second run before claims (PROTOCOL 6.1).
+
+Cross (kernel), same pattern in all three alphabets (bytes / dna / text):
+
+| L | ours / best library |
+|---|---|
+| 16 | 8.2-9.9x |
+| 32 | 4.1-5.0x |
+| 64 | 1.5-1.8x |
+| 128 | 0.9-1.0x (StringZilla's single thread wins narrowly) |
+| 256 | 0.7-0.8x (StringZilla wins) |
+
+Pairs (end-to-end, from Python lists), all three alphabets:
+
+| L | ours / best library |
+|---|---|
+| 16 | 2.1-3.1x |
+| 32 | 2.0-2.6x |
+| 64 | 1.8-2.2x |
+| 128 | 1.4-2.0x |
+| 256 | 1.2-1.4x |
+
+- H4.1 (>= 2x over the best library, L <= 64): **cross holds at L16-32,
+  fails at L64 (1.5-1.8x). Pairs holds at L16-32, borderline at L64.**
+- Alphabet makes little difference (the Peq table hides it).
+- Single-threaded at L16, ours (156M/s) beats StringZilla on all 10 cores
+  (114M/s); from L32 on, the multi-threaded library is faster.
+- Error rate barely matters for cross; for pairs, low error rates gain most
+  (trimming removes more).
