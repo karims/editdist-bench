@@ -12,6 +12,7 @@ import argparse
 import csv
 import json
 import os
+import random
 import statistics
 import sys
 import time
@@ -19,7 +20,7 @@ from datetime import datetime
 
 import numpy as np
 
-from bench import envinfo
+from bench import envinfo, sysload
 from bench.baselines import as_vector, contenders
 from bench.datagen import Bucket, grid, make_cross, make_pairs
 from bench.reference import myers_distance
@@ -28,28 +29,40 @@ GATE_SAMPLE = 300
 FIELDS = ["bucket", "alphabet", "length", "error_rate", "shape", "contender", "threads",
           "n_pairs", "cells", "gate", "mismatches_vs_consensus", "prep_s",
           "median_s", "iqr_s", "inner_repeats", "pairs_per_s", "gcups", "ns_per_pair",
-          "e2e_pairs_per_s", "checksum", "note"]
+          "e2e_pairs_per_s", "cpu_median_s", "cpu_pairs_per_s", "wall_over_cpu",
+          "checksum", "note"]
 
 
 MIN_SAMPLE_S = 0.05   # each timed sample repeats the batch until it lasts this long
 
 
-def _timed(fn, state, reps):
-    """Returns (output, median seconds per batch, IQR seconds per batch, inner)."""
+def _calibrate(fn, state):
+    """Warm-up call (its output is the one we check) and the number of inner
+    repeats needed for one timed sample to last >= MIN_SAMPLE_S."""
     t0 = time.perf_counter()
-    out = fn(state)                       # warm-up (also the output we check)
+    out = fn(state)
     once = max(time.perf_counter() - t0, 1e-7)
     inner = max(1, int(MIN_SAMPLE_S / once) + 1) if once < MIN_SAMPLE_S else 1
-    times = []
-    sink = 0
-    for _ in range(reps):
-        t0 = time.perf_counter()
-        for _ in range(inner):
-            r = fn(state)
-        times.append((time.perf_counter() - t0) / inner)
-        sink += int(as_vector(r).sum())   # consume
-    q = statistics.quantiles(times, n=4) if len(times) >= 2 else [times[0]] * 3
-    return out, statistics.median(times), q[2] - q[0], inner
+    return out, inner
+
+
+def _sample(fn, state, inner):
+    """One timed sample -> (wall s per batch, thread-CPU s per batch, checksum).
+
+    Thread CPU time excludes intervals when the OS ran something else on this
+    core, so wall/CPU > 1 means the sample was disturbed. For multi-threaded
+    contenders it only covers the calling thread and is not reported."""
+    fn(state)                                  # untimed: re-warm caches after other contenders
+    c0, t0 = time.thread_time(), time.perf_counter()
+    for _ in range(inner):
+        r = fn(state)
+    wall, cpu = time.perf_counter() - t0, time.thread_time() - c0
+    return wall / inner, cpu / inner, int(as_vector(r).sum())
+
+
+def _iqr(xs):
+    q = statistics.quantiles(xs, n=4) if len(xs) >= 2 else [xs[0]] * 3
+    return q[2] - q[0]
 
 
 def _gate(c, A, B):
@@ -95,6 +108,8 @@ def main():
     ap.add_argument("--lengths", default="", help="override grid, e.g. 16,64")
     ap.add_argument("--errors", default="", help="override grid, e.g. 0.01,0.2")
     ap.add_argument("--alphabets", default="", help="override grid, e.g. bytes,dna")
+    ap.add_argument("--strict", action="store_true",
+                    help="refuse to start if the machine is busy, on battery or throttled")
     args = ap.parse_args()
 
     n_pairs = args.pairs or (5000 if args.quick else 20000)
@@ -106,14 +121,23 @@ def main():
     if missing:
         print(f"NOTE: not installed, skipped: {', '.join(missing)}", file=sys.stderr)
 
+    before = sysload.snapshot()
+    if args.strict:
+        problems = sysload.strict_problems(before)
+        if problems:
+            print("--strict: not starting:\n  " + "\n  ".join(problems), file=sys.stderr)
+            sys.exit(2)
+
     os.makedirs(args.out, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     env = envinfo.collect()
     env["thread_qos"] = _prefer_performance_cores()
     env.update({"args": vars(args), "n_pairs": n_pairs, "n_cross": n_cross,
-                "skipped_missing": missing})
+                "skipped_missing": missing, "timing": "interleaved-shuffled",
+                "sysload_before": before})
     csv_path = os.path.join(args.out, f"prior_art_{stamp}.csv")
-    with open(os.path.join(args.out, f"prior_art_{stamp}.env.json"), "w") as f:
+    env_path = os.path.join(args.out, f"prior_art_{stamp}.env.json")
+    with open(env_path, "w") as f:
         json.dump(env, f, indent=2)
     print(f"cpu: {env.get('cpu')}   git: {env['git_commit'][:8]}"
           f"{' (dirty)' if env['git_dirty'] else ''}", file=sys.stderr)
@@ -144,15 +168,15 @@ def main():
                 n = len(A) * len(B)
                 cells = sum(len(a) for a in A) * sum(len(b) for b in B)
 
-            consensus = None
+            live = []                                  # (contender, row, state, prep_s, out, inner)
             for c in group:
                 gate = _gate(c, A, B)
                 row = {"bucket": bucket.name, "alphabet": bucket.alphabet,
                        "length": bucket.length, "error_rate": bucket.error_rate,
                        "shape": shape, "contender": c.name, "threads": c.threads,
                        "n_pairs": n, "cells": cells, "gate": gate, "note": c.note}
+                rows.append(row)
                 if gate != "pass":
-                    rows.append(row)
                     print(f"{bucket.name:22s} {shape:5s} {c.name:34s} {c.threads:>3s}  GATE {gate}",
                           file=sys.stderr)
                     continue
@@ -162,8 +186,27 @@ def main():
                     t0 = time.perf_counter()
                     state = c.prepare(A, B)
                     preps.append(time.perf_counter() - t0)
-                prep_s = statistics.median(preps)
-                out, med, iqr, inner = _timed(c.run, state, args.reps)
+                out, inner = _calibrate(c.run, state)
+                live.append((c, row, state, statistics.median(preps), out, inner))
+
+            # Interleave: every round times each contender once, in a fresh random
+            # order, so a burst of background load spreads across contenders
+            # instead of landing on whichever one happened to be running.
+            walls = [[] for _ in live]
+            cpus = [[] for _ in live]
+            sinks = [0] * len(live)
+            rng = random.Random(f"{args.seed}:{bucket.name}:{shape}")
+            for _ in range(args.reps):
+                order = list(range(len(live)))
+                rng.shuffle(order)
+                for i in order:
+                    c, _, state, _, _, inner = live[i]
+                    w_, c_, k_ = _sample(c.run, state, inner)
+                    walls[i].append(w_); cpus[i].append(c_); sinks[i] += k_
+
+            consensus = None
+            for i, (c, row, state, prep_s, out, inner) in enumerate(live):
+                med, iqr = statistics.median(walls[i]), _iqr(walls[i])
                 vec = as_vector(out)
                 if consensus is None:
                     consensus = vec
@@ -177,9 +220,16 @@ def main():
                     "checksum": int(vec.sum()),
                     "inner_repeats": inner,
                 })
-                rows.append(row)
+                if c.threads == "1":
+                    cmed = statistics.median(cpus[i])
+                    row.update({"cpu_median_s": f"{cmed:.6f}",
+                                "cpu_pairs_per_s": f"{n / cmed:.1f}",
+                                "wall_over_cpu": f"{med / cmed:.3f}"})
+                flag = f"  wall/cpu {med / statistics.median(cpus[i]):.2f}" \
+                    if c.threads == "1" and med > 1.05 * statistics.median(cpus[i]) else ""
                 print(f"{bucket.name:22s} {shape:5s} {c.name:34s} {c.threads:>3s}  "
                       f"{n / med:>14,.0f} pairs/s  {cells / med / 1e9:7.3f} GCUPS"
+                      f"  iqr {iqr / med:4.0%}{flag}"
                       f"{'  MISMATCH ' + str(mism) if mism else ''}", file=sys.stderr)
 
             with open(csv_path, "w", newline="") as f:      # rewrite after each bucket
@@ -187,8 +237,28 @@ def main():
                 w.writeheader()
                 w.writerows(rows)
 
+    env["sysload_after"] = after = sysload.snapshot()
+    with open(env_path, "w") as f:
+        json.dump(env, f, indent=2)
     _summary(rows)
+    _noise_report(rows, before, after)
     print(f"\nwrote {csv_path}", file=sys.stderr)
+
+
+def _noise_report(rows, before, after):
+    ok = [r for r in rows if r["gate"] == "pass"]
+    if not ok:
+        return
+    spread = sorted(float(r["iqr_s"]) / float(r["median_s"]) for r in ok)
+    woc = sorted(float(r["wall_over_cpu"]) for r in ok if r.get("wall_over_cpu"))
+    print(f"\nNoise: IQR/median median {statistics.median(spread):.1%}, "
+          f"max {spread[-1]:.1%}, rows > 5%: {sum(x > 0.05 for x in spread)}/{len(spread)}",
+          file=sys.stderr)
+    if woc:
+        print(f"       wall/CPU (1-thread) median {statistics.median(woc):.3f}, "
+              f"max {woc[-1]:.3f}  (1.000 = never descheduled)", file=sys.stderr)
+    print(f"       other processes' CPU: {before['others_cpu_pct']:.0f}% before, "
+          f"{after['others_cpu_pct']:.0f}% after", file=sys.stderr)
 
 
 def _summary(rows):
