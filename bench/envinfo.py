@@ -32,7 +32,8 @@ def collect() -> dict:
         "python": sys.version.split()[0],
         "logical_cpus": os.cpu_count(),
         "packages": {p: _version(p) for p in
-                     ("rapidfuzz", "edlib", "stringzilla", "stringzillas-cpus", "numpy")},
+                     ("rapidfuzz", "edlib", "stringzilla", "stringzillas-cpus",
+                      "stringzillas-cuda", "cupy-cuda12x", "numpy")},
     }
     if sys.platform == "darwin":
         info["cpu"] = _run(["sysctl", "-n", "machdep.cpu.brand_string"])
@@ -52,6 +53,15 @@ def collect() -> dict:
         pass
     from bench import cmyers
     info["c_kernels"] = cmyers.buildinfo() or "not built"
+    try:
+        from bench import cudamyers
+        if cudamyers.available():
+            info["gpu"] = cudamyers.device_info()
+            info["nvidia_smi"] = _run(["nvidia-smi", "--query-gpu=name,driver_version,"
+                                       "clocks.max.sm,power.limit,temperature.gpu",
+                                       "--format=csv,noheader"])
+    except Exception as e:
+        info["gpu"] = f"error: {e}"
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     info["git_commit"] = _run(["git", "-C", root, "rev-parse", "HEAD"])
     info["git_dirty"] = bool(_run(["git", "-C", root, "status", "--porcelain"]))

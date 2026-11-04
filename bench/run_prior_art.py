@@ -109,8 +109,10 @@ def main():
     ap.add_argument("--lengths", default="", help="override grid, e.g. 16,64")
     ap.add_argument("--errors", default="", help="override grid, e.g. 0.01,0.2")
     ap.add_argument("--alphabets", default="", help="override grid, e.g. bytes,dna")
-    ap.add_argument("--threads", choices=["1", "all", "both"], default="both",
-                    help="only single-threaded, only multi-threaded, or both contender kinds")
+    ap.add_argument("--threads", default="1,all,gpu",
+                    help="contender kinds to run, comma-separated: 1, all, gpu")
+    ap.add_argument("--exclude", default="",
+                    help="comma-separated substrings; contenders whose name contains one are skipped")
     ap.add_argument("--strict", action="store_true",
                     help="refuse to start if the machine is busy, on battery or throttled")
     args = ap.parse_args()
@@ -121,7 +123,8 @@ def main():
     all_c, missing = contenders()
     cs = [c for c in all_c if args.only in c.name
           and (args.shape == "both" or c.shape == args.shape)
-          and (args.threads == "both" or c.threads == args.threads)]
+          and c.threads in args.threads.split(",")
+          and not any(x and x in c.name for x in args.exclude.split(","))]
     if missing:
         print(f"NOTE: not installed, skipped: {', '.join(missing)}", file=sys.stderr)
 
@@ -212,7 +215,7 @@ def main():
             cpus = [[] for _ in live]
             sinks = [0] * len(live)
             rng = random.Random(f"{args.seed}:{bucket.name}:{shape}")
-            for cls in ("1", "all"):
+            for cls in ("1", "all", "gpu"):
                 idx = [i for i, x in enumerate(live) if x[0].threads == cls]
                 if not idx:
                     continue

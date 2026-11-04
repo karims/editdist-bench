@@ -1,0 +1,5 @@
+# Phase 5 (NVIDIA GPU). Installed by scripts/gpu_run.sh on top of requirements.txt;
+# stringzillas-cuda replaces stringzillas-cpus (same module name, CPU + CUDA backends).
+cupy-cuda12x>=13
+stringzillas-cuda>=5.0
+nvidia-cuda-nvrtc-cu12   # NVRTC, in case the image has no CUDA toolkit

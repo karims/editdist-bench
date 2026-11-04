@@ -132,6 +132,30 @@ def contenders() -> tuple[list[Contender], list[str]]:
     else:
         missing.append("ours.c-myers-ext (run `make PY=<venv python>`)")
 
+    # ---------------- GPU (phase 5) ----------------
+    from bench import cudamyers
+    if cudamyers.available():
+        from bench import cmyers as _cm
+        packed = lambda A, B: (_cm.pack(A), _cm.pack(B))
+        out += [
+            Contender("ours.cuda-pairs", "pairs", "gpu",
+                      lambda A, B: cudamyers.PairsState(*packed(A, B)),
+                      lambda st: cudamyers.pairs(st, True),
+                      note="phase 5: kernel-only; inputs on the GPU, result left there"),
+            Contender("ours.cuda-pairs+copy", "pairs", "gpu", packed,
+                      lambda st: cudamyers.pairs(cudamyers.PairsState(*st), True).get(),
+                      note="phase 5: includes copy to GPU, class split and copy back"),
+            Contender("ours.cuda-cross", "cross", "gpu",
+                      lambda A, B: cudamyers.CrossState(*packed(A, B)),
+                      lambda st: cudamyers.cross(st),
+                      note="phase 5: kernel-only; inputs on the GPU, result left there"),
+            Contender("ours.cuda-cross+copy", "cross", "gpu", packed,
+                      lambda st: cudamyers.cross(cudamyers.CrossState(*st)).get(),
+                      note="phase 5: includes copy to GPU and copy back"),
+        ]
+    else:
+        missing.append("ours.cuda-* (no NVIDIA GPU or CuPy)")
+
     return out, missing
 
 
@@ -179,6 +203,21 @@ def _stringzilla_contenders() -> list[Contender]:
                 lambda A, B: (sz.Strs([a for a in A for _ in B]), sz.Strs(list(B) * len(A))),
                 call, note="4.x pairwise API fed an expanded Q*C list"))
 
+    if "cuda" in tuple(getattr(szs, "__capabilities__", ())):
+        gscope = szs.DeviceScope(gpu_device=0)
+        gengine = szs.LevenshteinDistances(capabilities=gscope)
+        gcall = lambda st: gengine(st[0], st[1], device=gscope)
+        shape = "cross" if mode == "cross" else "pairs"
+        out.append(Contender(
+            "stringzilla.LevenshteinDistances", shape, "gpu",
+            lambda A, B: (szs.to_device(sz.Strs(A)), szs.to_device(sz.Strs(B))), gcall,
+            note="CUDA backend; inputs already in GPU-accessible (unified) memory"))
+        out.append(Contender(
+            "stringzilla.LevenshteinDistances+copy", shape, "gpu",
+            lambda A, B: (sz.Strs(A), sz.Strs(B)),
+            lambda st: gcall((szs.to_device(st[0]), szs.to_device(st[1]))),
+            note="CUDA backend; includes moving inputs to GPU-accessible memory"))
+
     if mode == "cross":
         # 5.x has no pairwise API: a 1x1 matrix per pair is the only exact option.
         scope1 = szs.DeviceScope(cpu_cores=1)
@@ -192,4 +231,6 @@ def _stringzilla_contenders() -> list[Contender]:
 
 
 def as_vector(result) -> np.ndarray:
+    if type(result).__module__.startswith("cupy"):
+        result = result.get()                     # GPU array -> host
     return _flat(result)
