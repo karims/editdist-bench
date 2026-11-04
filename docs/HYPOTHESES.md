@@ -86,3 +86,26 @@ shortcut), not a new algorithm. With few edits the trimmed core is tiny and
 per-pair overhead dominates; RapidFuzz spends ~40 ns/pair there, we ~14 ns.
 Where real DP work remains (L64/20%) we are at parity, which is the regime
 phase 4 (inter-pair SIMD) has to win.
+
+### H4.1 — preliminary, cross shape only (Linux VM on Apple M4)
+
+Source: `results/vm-linux/prior_art_20261104-034554.csv` (bytes, 200 x 200,
+single thread, kernel-only; env shows git_dirty because the contender
+registration was not yet committed when the run started).
+
+| Length | Best library | Scalar ours | NEON ours | NEON / library | NEON / scalar |
+|---|---|---|---|---|---|
+| 16 | 26.7M | 29.1M | 122M | 4.6x | 4.2x |
+| 32 | 12.3M | 12.9M | 23-24M | 1.9-2.0x | 1.8-1.9x |
+| 64 | 3.9-4.6M | 5.5-5.8M | 6.0M | 1.3-1.5x | 1.05-1.08x |
+| 128 | 1.5M | 1.8M | 1.8M (scalar fallback) | 1.2x | 1.0x |
+
+- **Holds for L <= 32** (>= 1.5x by a wide margin); **borderline at L = 64**
+  (1.32x at 5% errors fails, 1.53x at 20% passes); not attempted above 64.
+- Caveat on the comparison: RapidFuzz has SIMD for this shape only on x86
+  (SSE2/AVX2); on ARM it runs scalar. Part of the margin is that missing port,
+  so the claim is "fastest measured on ARM", not "faster than RapidFuzz's
+  algorithm".
+- NEON gains are far below lane count (4.2x with 8 lanes, 1.05x with 2).
+  Likely cause: each Myers step depends on the previous one, so one register
+  group is latency-bound. Next: interleave several independent groups.
