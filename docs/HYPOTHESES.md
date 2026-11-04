@@ -125,3 +125,37 @@ The latency explanation holds: K=4 is 1.5-2.4x over K=1 at every length, so
 one register group was waiting on its own dependency chain. With K=4, **H4.1
 now holds for the cross shape at every L <= 64** (>= 2x over the best library
 on this platform). Same caveat as before: RapidFuzz has no SIMD path on ARM.
+
+### Phase 4 step 2 — NEON kernel for independent pairs (VM, preliminary): negative
+
+Sources: `results/vm-linux/prior_art_20261104-035849.csv` (L16/32) and
+`prior_art_20261104-035904.csv` (L64/128); bytes, 10,000 pairs, single
+thread, kernel-only, pairs shape. All correctness gates: 0 mismatches.
+
+| Bucket | Best library | Scalar + trim | NEON K=1 | NEON K=4 | K=4 / trim |
+|---|---|---|---|---|---|
+| L16 e0.05 | 20.0M | 75.8M | 51.7M | 54.3M | 0.72x |
+| L16 e0.20 | 13.9M | 29.6M | 9.2M | 9.4M | 0.32x |
+| L32 e0.05 | 11.5M | 19.8M | 7.9M | 7.7M | 0.39x |
+| L32 e0.20 | 8.6M | 11.4M | 5.2M | 4.9M | 0.43x |
+| L64 e0.05 | 6.6M | 7.8M | 3.7M | 3.8M | 0.48x |
+| L64 e0.20 | 4.7M | 4.9M | 2.4M | 2.7M | 0.54x |
+| L128 e0.05 | 1.6M | 2.3M | 2.5M | 2.5M | 1.08x |
+| L128 e0.20 | 1.3M | 1.9M | 1.9M | 1.9M | 1.02x |
+
+- **H4.1 fails for the pairs shape** with this design. The NEON kernel is
+  slower than our own scalar kernel with trimming everywhere except L128,
+  where it is roughly equal.
+- K=4 is about the same as K=1, so this kernel is not latency-bound (unlike
+  cross). It is bound by the per-lane gather: in pairs mode every lane has a
+  different text, so each step loads one Peq word per lane from memory
+  instead of broadcasting one shared character as in cross mode.
+- Replacing the store-to-array-then-vector-load gather with direct lane
+  inserts (`vsetq_lane`) gave about +5-15% (L16 e0.20: 9.4M -> 10.8M); still
+  0.34-0.55x of scalar + trim below L128. Kept, since it is strictly better.
+- Trimming also removes most of the work on near-identical pairs, which the
+  scalar path exploits pair by pair; lanes in a SIMD group run to the longest
+  remaining text, so they waste that saving.
+- Decision: the default for pairs stays scalar + trim. Options left open:
+  a transposed Peq layout or NEON `tbl` lookups for small alphabets, and a
+  hybrid dispatch that uses NEON only for patterns > 64.

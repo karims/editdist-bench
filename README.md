@@ -19,7 +19,7 @@ narrow question:
 | 2 | Prior-art benchmark (RapidFuzz, StringZilla, edlib) | runner done, **numbers pending (run on target hardware)** |
 | 3 | Plain C Myers baseline | done (VM, preliminary): kernel parity with libraries |
 | 3b | Prefix/suffix trimming + in-place `str` extension | done (VM, preliminary): up to 3.4x end-to-end on near-identical short pairs, parity at L64/20% |
-| 4 | Batched / SIMD (NEON) variants | next |
+| 4 | Batched / SIMD (NEON) variants | done (VM, preliminary): cross shape 2.0-7.7x over best library on ARM; pairs shape negative (scalar + trim stays faster) |
 | 5 | GPU (CUDA) variant | later |
 
 ## Layout
