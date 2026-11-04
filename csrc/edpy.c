@@ -120,7 +120,30 @@ done:
     return ret;
 }
 
+/* pairs_simd(a_list, b_list, out, trim=True, k=4): NEON inter-pair kernel */
+static PyObject *py_pairs_simd(PyObject *self, PyObject *args) {
+    (void)self;
+    PyObject *oa, *ob; Py_buffer out; int trim = 1, k = 4;
+    if (!PyArg_ParseTuple(args, "OOw*|pi", &oa, &ob, &out, &trim, &k)) return NULL;
+    seq_t A, B;
+    if (seq_load(oa, &A) < 0) { PyBuffer_Release(&out); return NULL; }
+    if (seq_load(ob, &B) < 0) { seq_free(&A); PyBuffer_Release(&out); return NULL; }
+    PyObject *ret = NULL;
+    if (A.n != B.n) { PyErr_SetString(PyExc_ValueError, "length mismatch"); goto done; }
+    if (out.len < (Py_ssize_t)(A.n * sizeof(int32_t))) {
+        PyErr_SetString(PyExc_ValueError, "output buffer too small"); goto done;
+    }
+    int rc = pairs_simd_core(A.ptr, A.len, B.ptr, B.len, A.n, (int32_t *)out.buf, trim, k);
+    if (rc == -2) { PyErr_SetString(PyExc_ValueError, "k must be 1, 2 or 4"); goto done; }
+    if (rc != 0) { PyErr_NoMemory(); goto done; }
+    ret = Py_None; Py_INCREF(ret);
+done:
+    seq_free(&A); seq_free(&B); PyBuffer_Release(&out);
+    return ret;
+}
+
 static PyMethodDef methods[] = {
+    {"pairs_simd", py_pairs_simd, METH_VARARGS, "pairs_simd(a, b, out, trim=True, k=4)"},
     {"pairs", py_pairs, METH_VARARGS, "pairs(a, b, out, trim=True)"},
     {"cross", py_cross, METH_VARARGS, "cross(q, c, out)"},
     {NULL, NULL, 0, NULL},

@@ -34,6 +34,9 @@ def _lib():
     lib.ed_cross_simd.restype = ctypes.c_int
     lib.ed_cross_simd_k.argtypes = lib.ed_cross.argtypes + [ctypes.c_int]
     lib.ed_cross_simd_k.restype = ctypes.c_int
+    lib.ed_pairs_simd.argtypes = [_P_U8, _P_I64, _P_U8, _P_I64, ctypes.c_int64, _P_I32,
+                                  ctypes.c_int, ctypes.c_int]
+    lib.ed_pairs_simd.restype = ctypes.c_int
     lib.ed_simd_available.argtypes = []
     lib.ed_simd_available.restype = ctypes.c_int
     return lib
@@ -94,6 +97,19 @@ def cross_simd(packed_q, packed_c, k: int = 1) -> np.ndarray:
     return out
 
 
+def pairs_simd(packed_a, packed_b, trim: bool = True, k: int = 4) -> np.ndarray:
+    """Phase 4 step 2: NEON kernel for independent pairs (scalar without NEON)."""
+    (ba, oa), (bb, ob) = packed_a, packed_b
+    n = len(oa) - 1
+    out = np.empty(n, dtype=np.int32)
+    rc = lib().ed_pairs_simd(ba, oa, bb, ob, n, out, int(trim), int(k))
+    if rc == -2:
+        raise ValueError("k must be 1, 2 or 4")
+    if rc != 0:
+        raise MemoryError("ed_pairs_simd allocation failed")
+    return out
+
+
 def buildinfo() -> str:
     try:
         with open(BUILDINFO) as f:
@@ -133,4 +149,10 @@ def ext_pairs(A, B, trim: bool = True) -> np.ndarray:
 def ext_cross(Q, C) -> np.ndarray:
     out = np.empty((len(Q), len(C)), dtype=np.int32)
     _EXT.cross(Q, C, out)
+    return out
+
+
+def ext_pairs_simd(A, B, trim: bool = True, k: int = 4) -> np.ndarray:
+    out = np.empty(len(A), dtype=np.int32)
+    _EXT.pairs_simd(A, B, out, trim, k)
     return out

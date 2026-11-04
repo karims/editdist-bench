@@ -388,3 +388,173 @@ int ed_cross_simd(const uint8_t *buf_q, const int64_t *off_q, int64_t nq,
                   int32_t *out) {
     return ed_cross_simd_k(buf_q, off_q, nq, buf_c, off_c, nc, out, 1);
 }
+
+/* ------------------------------------------------------------------------
+ * Phase 4 step 2: inter-pair SIMD for INDEPENDENT pairs.
+ *
+ * Every lane has its own pattern and its own text, so each step gathers one
+ * Peq entry per lane (scalar loads; NEON has no gather) and a per-lane
+ * "active" mask freezes the score of lanes whose text has ended. Pairs are
+ * trimmed, the shorter string becomes the pattern, and pairs within a
+ * length class are sorted by text length so lanes of a group end together.
+ * ---------------------------------------------------------------------- */
+
+typedef struct { const uint8_t *p, *t; int lp, lt; int64_t idx; } pair_t;
+
+static int cmp_lt_desc(const void *x, const void *y) {
+    int a = ((const pair_t *)x)->lt, b = ((const pair_t *)y)->lt;
+    return (a < b) - (a > b);
+}
+
+#if defined(__ARM_NEON)
+static const uint8_t ZERO_BYTE = 0;
+
+#define DEFINE_PAIRS_KERNEL(NAME, VT, ET, LANES, K, DUP, LD, ST, AND, ORR, EOR, ADD, SUB, SHL1, TST, CLT) \
+static void NAME(const pair_t *pr, int cnt, int32_t *out) {                                       \
+    static _Thread_local ET table[K][256][LANES];   /* zero; cleared after each use */            \
+    ET last[K][LANES], m0[K][LANES], nlen[K][LANES];                                               \
+    const uint8_t *tp[K][LANES];                                                                   \
+    int maxn = 0;                                                                                  \
+    for (int s = 0; s < K * LANES; s++) {                                                          \
+        int g = s / LANES, l = s % LANES;                                                          \
+        if (s < cnt) {                                                                             \
+            const pair_t *x = &pr[s];                                                              \
+            for (int i = 0; i < x->lp; i++) table[g][x->p[i]][l] |= (ET)((ET)1 << i);             \
+            last[g][l] = (ET)((ET)1 << (x->lp - 1));                                               \
+            m0[g][l] = (ET)x->lp; nlen[g][l] = (ET)x->lt; tp[g][l] = x->t;                         \
+            if (x->lt > maxn) maxn = x->lt;                                                        \
+        } else {                                                                                   \
+            last[g][l] = 0; m0[g][l] = 0; nlen[g][l] = 0; tp[g][l] = &ZERO_BYTE;                   \
+        }                                                                                          \
+    }                                                                                              \
+    const VT ones = DUP((ET)~(ET)0), one = DUP((ET)1);                                             \
+    VT L[K], NL[K], Pv[K], Mv[K], score[K];                                                        \
+    for (int g = 0; g < K; g++) {                                                                  \
+        L[g] = LD(last[g]); NL[g] = LD(nlen[g]); score[g] = LD(m0[g]);                             \
+        Pv[g] = ones; Mv[g] = DUP((ET)0);                                                          \
+    }                                                                                              \
+    ET e[LANES];                                                                                   \
+    for (int j = 0; j < maxn; j++) {                                                               \
+        const VT J = DUP((ET)j);                                                                   \
+        for (int g = 0; g < K; g++) {                                                              \
+            for (int l = 0; l < LANES; l++)                                                        \
+                e[l] = table[g][(j < (int)nlen[g][l]) ? tp[g][l][j] : 0][l];                       \
+            VT Eq = LD(e);                                                                         \
+            VT act = CLT(J, NL[g]);                                                                \
+            VT Xv = ORR(Eq, Mv[g]);                                                                \
+            VT Xh = ORR(EOR(ADD(AND(Eq, Pv[g]), Pv[g]), Pv[g]), Eq);                               \
+            VT Ph = ORR(Mv[g], EOR(ORR(Xh, Pv[g]), ones));                                         \
+            VT Mh = AND(Pv[g], Xh);                                                                \
+            score[g] = ADD(SUB(score[g], AND(TST(Ph, L[g]), act)), AND(TST(Mh, L[g]), act));       \
+            Ph = ORR(SHL1(Ph), one);                                                               \
+            Mh = SHL1(Mh);                                                                         \
+            Pv[g] = ORR(Mh, EOR(ORR(Xv, Ph), ones));                                               \
+            Mv[g] = AND(Ph, Xv);                                                                   \
+        }                                                                                          \
+    }                                                                                              \
+    ET res[LANES];                                                                                 \
+    for (int g = 0; g < K; g++) {                                                                  \
+        ST(res, score[g]);                                                                         \
+        for (int l = 0; l < LANES; l++) {                                                          \
+            int s = g * LANES + l;                                                                 \
+            if (s >= cnt) break;                                                                   \
+            out[pr[s].idx] = (int32_t)res[l];                                                      \
+            for (int i = 0; i < pr[s].lp; i++) table[g][pr[s].p[i]][l] = 0;                        \
+        }                                                                                          \
+    }                                                                                              \
+}
+
+#define PINST(W, VT, ET, LANES, K) \
+    DEFINE_PAIRS_KERNEL(pairs##W##_k##K, VT, ET, LANES, K, vdupq_n_u##W, vld1q_u##W, vst1q_u##W, \
+                        vandq_u##W, vorrq_u##W, veorq_u##W, vaddq_u##W, vsubq_u##W, SHL1_##W,    \
+                        vtstq_u##W, vcltq_u##W)
+PINST(16, uint16x8_t, uint16_t, 8, 1)
+PINST(16, uint16x8_t, uint16_t, 8, 2)
+PINST(16, uint16x8_t, uint16_t, 8, 4)
+PINST(32, uint32x4_t, uint32_t, 4, 1)
+PINST(32, uint32x4_t, uint32_t, 4, 2)
+PINST(32, uint32x4_t, uint32_t, 4, 4)
+PINST(64, uint64x2_t, uint64_t, 2, 1)
+PINST(64, uint64x2_t, uint64_t, 2, 2)
+PINST(64, uint64x2_t, uint64_t, 2, 4)
+#endif
+
+/* Core over pointer/length arrays (shared by the ctypes and CPython paths).
+ * Returns 0, -1 on allocation failure, -2 for an invalid k. */
+static int pairs_simd_core(const uint8_t *const *pa, const int *la,
+                           const uint8_t *const *pb, const int *lb,
+                           int64_t n, int32_t *out, int trim, int k) {
+    if (k != 1 && k != 2 && k != 4) return -2;
+    pair_t *cls[4] = {0};
+    int64_t cnt[4] = {0, 0, 0, 0};
+    for (int c = 0; c < 4; c++)
+        if (!(cls[c] = malloc(sizeof(pair_t) * (n ? n : 1)))) {
+            for (int z = 0; z < c; z++) free(cls[z]);
+            return -1;
+        }
+    for (int64_t i = 0; i < n; i++) {
+        const uint8_t *a = pa[i], *b = pb[i];
+        int x = la[i], y = lb[i];
+        if (trim) trim_affix(&a, &x, &b, &y);
+        if (x > y) { const uint8_t *t = a; a = b; b = t; int z = x; x = y; y = z; }
+        if (x == 0) { out[i] = y; continue; }
+#if defined(__ARM_NEON)
+        int c = (x <= 16 && y < 65535) ? 0 : (x <= 32 ? 1 : (x <= 64 ? 2 : 3));
+#else
+        int c = 3;
+#endif
+        cls[c][cnt[c]++] = (pair_t){a, b, x, y, i};
+    }
+    int rc = 0;
+#if defined(__ARM_NEON)
+    const int lanes[3] = {8, 4, 2};
+    for (int c = 0; c < 3; c++) {
+        qsort(cls[c], (size_t)cnt[c], sizeof(pair_t), cmp_lt_desc);
+        for (int64_t g = 0; g < cnt[c];) {
+            int64_t left = cnt[c] - g;
+            int kk = (k >= 4 && left > 2 * lanes[c]) ? 4 : (k >= 2 && left > lanes[c]) ? 2 : 1;
+            int take = (int)(left < (int64_t)kk * lanes[c] ? left : (int64_t)kk * lanes[c]);
+            const pair_t *p = cls[c] + g;
+            if (c == 0) { if (kk == 4) pairs16_k4(p, take, out); else if (kk == 2) pairs16_k2(p, take, out); else pairs16_k1(p, take, out); }
+            if (c == 1) { if (kk == 4) pairs32_k4(p, take, out); else if (kk == 2) pairs32_k2(p, take, out); else pairs32_k1(p, take, out); }
+            if (c == 2) { if (kk == 4) pairs64_k4(p, take, out); else if (kk == 2) pairs64_k2(p, take, out); else pairs64_k1(p, take, out); }
+            g += take;
+        }
+    }
+#endif
+    if (cnt[3]) {   /* long patterns: scalar */
+        int mx = 0;
+        for (int64_t i = 0; i < cnt[3]; i++) if (cls[3][i].lp > mx) mx = cls[3][i].lp;
+        ws_t ws = {0};
+        word *Pv = NULL, *Mv = NULL;
+        if (ws_init(&ws, (mx + 63) >> 6) || !(Pv = malloc(sizeof(word) * ws.W)) ||
+            !(Mv = malloc(sizeof(word) * ws.W))) {
+            rc = -1;
+        } else {
+            for (int64_t i = 0; i < cnt[3]; i++) {
+                const pair_t *x = &cls[3][i];
+                out[x->idx] = pair_distance(&ws, Pv, Mv, x->p, x->lp, x->t, x->lt, 0);
+            }
+        }
+        free(Pv); free(Mv); if (ws.peq) ws_free(&ws);
+    }
+    for (int c = 0; c < 4; c++) free(cls[c]);
+    return rc;
+}
+
+int ed_pairs_simd(const uint8_t *buf_a, const int64_t *off_a,
+                  const uint8_t *buf_b, const int64_t *off_b,
+                  int64_t n, int32_t *out, int trim, int k) {
+    const uint8_t **pa = malloc(sizeof(*pa) * (n ? n : 1)), **pb = malloc(sizeof(*pb) * (n ? n : 1));
+    int *la = malloc(sizeof(int) * (n ? n : 1)), *lb = malloc(sizeof(int) * (n ? n : 1));
+    int rc = -1;
+    if (pa && pb && la && lb) {
+        for (int64_t i = 0; i < n; i++) {
+            pa[i] = buf_a + off_a[i]; la[i] = (int)(off_a[i + 1] - off_a[i]);
+            pb[i] = buf_b + off_b[i]; lb[i] = (int)(off_b[i + 1] - off_b[i]);
+        }
+        rc = pairs_simd_core(pa, la, pb, lb, n, out, trim, k);
+    }
+    free(pa); free(pb); free(la); free(lb);
+    return rc;
+}
