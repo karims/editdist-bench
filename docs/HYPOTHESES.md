@@ -36,6 +36,26 @@ or engineering.
 single thread. *Decision:* this is the project's main claim; if it fails
 after reasonable effort, we report the negative result and move to the GPU.
 
+## Phase 5 — GPU (CUDA, NVIDIA)
+
+Written before any GPU code or measurement. One rented NVIDIA GPU; CPU
+baselines are measured on the same rented machine. Same correctness gate.
+
+**H5.1 — Beat the GPU library.** With data already on the GPU (kernel-only),
+our CUDA kernels are >= 1.5x StringZilla's CUDA backend, for both shapes, at
+every L <= 64. *Decision:* the GPU-phase claim; if it fails after reasonable
+effort, we report the negative result.
+
+**H5.2 — The GPU is worth it for short strings.** Kernel-only, our best GPU
+throughput at L <= 64 is >= 10x the best all-cores CPU result (any library or
+ours) on the same machine. *Decision:* if not, the GPU is not worth it for
+this niche, and the write-up says so.
+
+**H5.3 — Copying has a crossover.** Counting the copy of inputs to the GPU
+and of results back, the GPU is still >= 3x the all-cores CPU at 1,000,000
+pairs, and there is a batch size below which the CPU wins; we predict it lies
+between 10,000 and 100,000 pairs. *Decision:* tells users when to use which.
+
 ## Outcomes
 
 ### H3.1 — preliminary (Linux VM on Apple M4, 4 vCPUs; quick grid, `bytes` alphabet)
@@ -216,3 +236,12 @@ Pairs (end-to-end, from Python lists), all three alphabets:
   (114M/s); from L32 on, the multi-threaded library is faster.
 - Error rate barely matters for cross; for pairs, low error rates gain most
   (trimming removes more).
+
+### Correction — H4.1 threshold
+
+H4.1 as pre-registered above says **>= 1.5x** over the best library at
+L <= 64. The outcome notes "Phase 4 step 1" and "Native macOS ... official
+run 1 of 2" wrongly used 2x as the bar. Against the registered 1.5x, on the
+first full M4 run: **cross holds at every L <= 64** (L64: 1.5-1.8x, the
+lowest cell exactly at the line), and **pairs holds at every L <= 64**
+(end-to-end L64: 1.8-2.2x). Final verdict after the second official run.
