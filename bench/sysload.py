@@ -59,9 +59,10 @@ def snapshot() -> dict:
     }
 
 
-# --strict thresholds: other processes together may use at most a quarter of
-# one core, and the machine must be plugged in.
-MAX_OTHERS_CPU_PCT = 25.0
+# --strict thresholds: other processes together may use at most half of one
+# core (of 10 on the M4; measured wall/CPU stayed ~1.00 at this level), and
+# the machine must be plugged in.
+MAX_OTHERS_CPU_PCT = 50.0
 
 
 def strict_problems(s: dict) -> list[str]:

@@ -127,10 +127,18 @@ def main():
 
     before = sysload.snapshot()
     if args.strict:
-        problems = sysload.strict_problems(before)
-        if problems:
-            print("--strict: not starting:\n  " + "\n  ".join(problems), file=sys.stderr)
-            sys.exit(2)
+        # Starting this process (loading Python, numpy and the libraries) itself
+        # wakes macOS's code-signing check (syspolicyd), so wait for it to pass.
+        for attempt in range(25):
+            problems = sysload.strict_problems(before)
+            if not problems:
+                break
+            if attempt == 24:
+                print("--strict: not starting:\n  " + "\n  ".join(problems), file=sys.stderr)
+                sys.exit(2)
+            print("  waiting: " + "; ".join(problems), file=sys.stderr)
+            time.sleep(5)
+            before = sysload.snapshot()
 
     os.makedirs(args.out, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")

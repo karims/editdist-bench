@@ -109,7 +109,7 @@ of 14-19% of the median):**
 
 Results used for claims come from `scripts/official_run.sh`, which: refuses
 uncommitted changes; shows a checklist (power, other apps, indexing); waits
-until other processes use < 25% of one core; prevents sleep; and runs with
+until other processes use < 50% of one core; prevents sleep; and runs with
 `--strict --reps 11`. `--strict` refuses to start on battery, when throttled,
 or when the machine is busy. A row is reported with its IQR.
 
