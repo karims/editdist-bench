@@ -28,7 +28,9 @@ for c in python3.13 python3.12 python3.11 python3.10 \
          /opt/homebrew/bin/python3 "$HOME/miniconda3/bin/python3" python3; do
   if command -v "$c" >/dev/null 2>&1 && \
      "$c" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)' 2>/dev/null; then
-    PY="$(command -v "$c")"
+    # Resolve to the real interpreter: if a venv is active, "python3.12" may be
+    # .venv/bin/python3.12, which the next step deletes.
+    PY="$("$c" -c 'import os, sys; print(os.path.realpath(sys.executable))')"
     break
   fi
 done
