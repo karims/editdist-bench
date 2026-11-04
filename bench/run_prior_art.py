@@ -65,6 +65,22 @@ def _gate(c, A, B):
     return "pass" if np.array_equal(got, exp) else f"FAIL({int((got != exp).sum())})"
 
 
+def _prefer_performance_cores() -> str:
+    """macOS: ask for the highest thread QoS so the timing thread is scheduled
+    on performance cores rather than drifting onto efficiency cores (a major
+    source of run-to-run spread on Apple Silicon). No-op elsewhere."""
+    if sys.platform != "darwin":
+        return "n/a"
+    try:
+        import ctypes
+        qos_user_interactive = 0x21
+        rc = ctypes.CDLL("/usr/lib/libSystem.dylib").pthread_set_qos_class_self_np(
+            qos_user_interactive, 0)
+        return "user-interactive" if rc == 0 else f"failed rc={rc}"
+    except Exception as e:  # never block a run on this
+        return f"failed: {e}"
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -93,6 +109,7 @@ def main():
     os.makedirs(args.out, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     env = envinfo.collect()
+    env["thread_qos"] = _prefer_performance_cores()
     env.update({"args": vars(args), "n_pairs": n_pairs, "n_cross": n_cross,
                 "skipped_missing": missing})
     csv_path = os.path.join(args.out, f"prior_art_{stamp}.csv")
