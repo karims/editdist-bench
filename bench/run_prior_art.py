@@ -34,6 +34,7 @@ FIELDS = ["bucket", "alphabet", "length", "error_rate", "shape", "contender", "t
 
 
 MIN_SAMPLE_S = 0.05   # each timed sample repeats the batch until it lasts this long
+SETTLE_S = 1.0        # idle pause before each thread class, so pools/clocks settle
 
 
 def _calibrate(fn, state):
@@ -108,6 +109,8 @@ def main():
     ap.add_argument("--lengths", default="", help="override grid, e.g. 16,64")
     ap.add_argument("--errors", default="", help="override grid, e.g. 0.01,0.2")
     ap.add_argument("--alphabets", default="", help="override grid, e.g. bytes,dna")
+    ap.add_argument("--threads", choices=["1", "all", "both"], default="both",
+                    help="only single-threaded, only multi-threaded, or both contender kinds")
     ap.add_argument("--strict", action="store_true",
                     help="refuse to start if the machine is busy, on battery or throttled")
     args = ap.parse_args()
@@ -117,7 +120,8 @@ def main():
 
     all_c, missing = contenders()
     cs = [c for c in all_c if args.only in c.name
-          and (args.shape == "both" or c.shape == args.shape)]
+          and (args.shape == "both" or c.shape == args.shape)
+          and (args.threads == "both" or c.threads == args.threads)]
     if missing:
         print(f"NOTE: not installed, skipped: {', '.join(missing)}", file=sys.stderr)
 
@@ -192,17 +196,25 @@ def main():
             # Interleave: every round times each contender once, in a fresh random
             # order, so a burst of background load spreads across contenders
             # instead of landing on whichever one happened to be running.
+            # Single- and multi-threaded contenders are interleaved only within
+            # their own class: multi-threaded runs load every core (lowering the
+            # clock) and their worker pools may keep spinning after returning,
+            # which would disturb single-threaded samples. Settle in between.
             walls = [[] for _ in live]
             cpus = [[] for _ in live]
             sinks = [0] * len(live)
             rng = random.Random(f"{args.seed}:{bucket.name}:{shape}")
-            for _ in range(args.reps):
-                order = list(range(len(live)))
-                rng.shuffle(order)
-                for i in order:
-                    c, _, state, _, _, inner = live[i]
-                    w_, c_, k_ = _sample(c.run, state, inner)
-                    walls[i].append(w_); cpus[i].append(c_); sinks[i] += k_
+            for cls in ("1", "all"):
+                idx = [i for i, x in enumerate(live) if x[0].threads == cls]
+                if not idx:
+                    continue
+                time.sleep(SETTLE_S)
+                for _ in range(args.reps):
+                    rng.shuffle(idx)
+                    for i in idx:
+                        c, _, state, _, _, inner = live[i]
+                        w_, c_, k_ = _sample(c.run, state, inner)
+                        walls[i].append(w_); cpus[i].append(c_); sinks[i] += k_
 
             consensus = None
             for i, (c, row, state, prep_s, out, inner) in enumerate(live):
@@ -213,7 +225,7 @@ def main():
                 mism = int((vec != consensus).sum())
                 row.update({
                     "mismatches_vs_consensus": mism,
-                    "prep_s": f"{prep_s:.6f}", "median_s": f"{med:.6f}", "iqr_s": f"{iqr:.6f}",
+                    "prep_s": f"{prep_s:.4e}", "median_s": f"{med:.4e}", "iqr_s": f"{iqr:.4e}",
                     "pairs_per_s": f"{n / med:.1f}", "gcups": f"{cells / med / 1e9:.4f}",
                     "ns_per_pair": f"{med / n * 1e9:.1f}",
                     "e2e_pairs_per_s": f"{n / (med + prep_s):.1f}",   # incl. conversion from Python lists
@@ -222,7 +234,7 @@ def main():
                 })
                 if c.threads == "1":
                     cmed = statistics.median(cpus[i])
-                    row.update({"cpu_median_s": f"{cmed:.6f}",
+                    row.update({"cpu_median_s": f"{cmed:.4e}",
                                 "cpu_pairs_per_s": f"{n / cmed:.1f}",
                                 "wall_over_cpu": f"{med / cmed:.3f}"})
                 flag = f"  wall/cpu {med / statistics.median(cpus[i]):.2f}" \
