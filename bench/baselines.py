@@ -106,6 +106,11 @@ def contenders() -> tuple[list[Contender], list[str]]:
                 out.append(Contender(f"ours.c-myers-neon-k{kk}", "cross", "1", both,
                                      (lambda k: lambda st: cmyers.cross_simd(*st, k=k))(kk),
                                      note=f"phase 4: {kk} independent register groups interleaved"))
+        if cmyers.simd_available():
+            for kk in (1, 4):
+                out.append(Contender(f"ours.c-myers-neon-pairs-k{kk}", "pairs", "1", both,
+                                     (lambda k: lambda st: cmyers.pairs_simd(*st, trim=True, k=k))(kk),
+                                     note=f"phase 4.2: trim + NEON lanes per pair, K={kk}"))
         out.append(Contender("ours.c-myers-trim", "pairs", "1", both,
                              lambda st: cmyers.pairs(*st, trim=True),
                              note="phase 3b ablation: plain + common prefix/suffix trimming"))
@@ -117,6 +122,9 @@ def contenders() -> tuple[list[Contender], list[str]]:
             Contender("ours.c-myers-ext", "pairs", "1", ident,
                       lambda st: cmyers.ext_pairs(st[0], st[1], True),
                       note="phase 3b: trim + reads Python str in place (no conversion)"),
+            Contender("ours.c-myers-ext-neon", "pairs", "1", ident,
+                      lambda st: cmyers.ext_pairs_simd(st[0], st[1], True, 4),
+                      note="phase 4.2: in-place str + trim + NEON pairs, K=4"),
             Contender("ours.c-myers-ext", "cross", "1", ident,
                       lambda st: cmyers.ext_cross(st[0], st[1]),
                       note="phase 3b: reads Python str in place"),
