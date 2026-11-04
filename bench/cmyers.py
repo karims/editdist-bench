@@ -8,8 +8,10 @@ import os
 import numpy as np
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-LIB_PATH = os.path.join(_ROOT, "build", "libmyers.so")
-BUILDINFO = os.path.join(_ROOT, "build", "BUILDINFO")
+# Matches the Makefile: build/<uname -s>-<uname -m> (e.g. Darwin-arm64, Linux-aarch64).
+_BUILD = os.path.join(_ROOT, "build", f"{os.uname().sysname}-{os.uname().machine}")
+LIB_PATH = os.path.join(_BUILD, "libmyers.so")
+BUILDINFO = os.path.join(_BUILD, "BUILDINFO")
 
 _P_U8 = np.ctypeslib.ndpointer(np.uint8, flags="C_CONTIGUOUS")
 _P_I64 = np.ctypeslib.ndpointer(np.int64, flags="C_CONTIGUOUS")
@@ -123,7 +125,7 @@ def buildinfo() -> str:
 def _load_ext():
     import importlib.util
     import sysconfig
-    path = os.path.join(_ROOT, "build", "_edpy" + sysconfig.get_config_var("EXT_SUFFIX"))
+    path = os.path.join(_BUILD, "_edpy" + sysconfig.get_config_var("EXT_SUFFIX"))
     if not os.path.exists(path):
         return None
     spec = importlib.util.spec_from_file_location("_edpy", path)
