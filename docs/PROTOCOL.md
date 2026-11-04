@@ -111,8 +111,18 @@ Results used for claims come from `scripts/official_run.sh`, which: refuses
 uncommitted changes; shows a checklist (power, other apps, indexing); waits
 until other processes use < 25% of one core; prevents sleep; and runs with
 `--strict --reps 11`. `--strict` refuses to start on battery, when throttled,
-or when the machine is busy. A row is reported with its IQR; rows whose
-IQR/median exceeds 5% are flagged as noisy in write-ups.
+or when the machine is busy. A row is reported with its IQR.
+
+**Amendment (claim rule).** On the M4, a single kernel timed in isolation
+varies by < 1% (`scripts/jitter_probe.py`), but rows inside a full run vary
+by about 11% (IQR/median), while medians reproduce across separate runs to
+about 5%. A 5% per-row limit is therefore not achievable on macOS, and is
+replaced by: **a speedup is claimed only if it holds in at least two
+separate official runs and exceeds 1 + 2 x (the larger relative IQR of the
+two rows compared).** Single- and multi-threaded contenders are timed in
+separate phases (multi-threaded runs load every core and lower the clock),
+with a 1 s pause before each. Final numbers are expected to come from the
+GPU phase anyway; macOS numbers are supporting evidence.
 
 ## 7. Reporting rules
 
