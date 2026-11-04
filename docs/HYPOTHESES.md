@@ -159,3 +159,25 @@ thread, kernel-only, pairs shape. All correctness gates: 0 mismatches.
 - Decision: the default for pairs stays scalar + trim. Options left open:
   a transposed Peq layout or NEON `tbl` lookups for small alphabets, and a
   hybrid dispatch that uses NEON only for patterns > 64.
+
+### Native macOS (Apple M4) — three runs, supersedes VM numbers where they differ
+
+Sources: `results/macos-m4/prior_art_20261103-232923`, `-233524`,
+`-234330` (quick grid, bytes, single thread unless noted). All gates pass in
+all runs. Ranges span the runs.
+
+| Result | Ours | Best library (1 thread) | Ratio |
+|---|---|---|---|
+| Cross L16, NEON K=4 | 128-148M | StringZilla 18.5-18.8M | 7-8x (also >= StringZilla on all 10 cores, 96-138M) |
+| Cross L64, NEON K=4 | 5.1-5.3M | StringZilla 3.0-3.8M | 1.4-1.7x |
+| Pairs L16 e0.05, scalar + trim (ext) | 49-52M | RapidFuzz 12.4-15.5M | 3.3-4.0x |
+| Pairs L64, NEON pairs (ext-neon) | 5.2-8.3M | RapidFuzz 2.7-3.9M | ~2x |
+| L256, both shapes | 0.3-0.4M | 0.3-0.5M | ~parity (no NEON path above 64) |
+
+- **H4.1, cross:** holds at L16 (and L32 on the VM); **fails at L64 on native
+  hardware** (1.4-1.7x vs the 2x target; the VM showed 2.0-2.3x).
+- **Pairs NEON, revised:** the VM negative result does not carry over. On the
+  M4 the NEON pairs kernel beats scalar + trim at L64 (e.g. 7.9M vs 5.2M) and
+  is ~2x RapidFuzz. At L16 it is roughly level with scalar + trim. The VM's
+  slower per-lane gathers made it look worse than it is.
+- Caveat unchanged: RapidFuzz has no SIMD path on ARM.
