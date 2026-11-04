@@ -162,3 +162,145 @@ int ed_cross(const uint8_t *buf_q, const int64_t *off_q, int64_t nq,
     free(Pv); free(Mv); ws_free(&ws);
     return 0;
 }
+
+/* ------------------------------------------------------------------------
+ * Phase 4: inter-pair SIMD (NEON) for the cross shape.
+ *
+ * Candidates are packed as patterns, LANES per 128-bit register (16-bit lanes
+ * for length <= 16, 32-bit for <= 32, 64-bit for <= 64). The query is the
+ * text, shared by all lanes, so every lane advances in lockstep and none
+ * finishes early. Each lane's carries stay inside the lane (NEON adds and
+ * shifts are per-lane), and each lane reads its score at its own last bit via
+ * a per-lane mask. Packing short patterns into one word is due to Hyyro,
+ * Fredriksson & Navarro (2005); this is that idea on NEON lanes.
+ *
+ * Longer candidates (> 64) and builds without NEON use the scalar kernel.
+ * ---------------------------------------------------------------------- */
+
+int ed_simd_available(void) {
+#if defined(__ARM_NEON)
+    return 1;
+#else
+    return 0;
+#endif
+}
+
+#if defined(__ARM_NEON)
+#include <arm_neon.h>
+
+/* One group: up to LANES candidate patterns (idx[]) vs every query. */
+#define DEFINE_GROUP_KERNEL(NAME, VT, ET, LANES, DUP, LD, ST, AND, ORR, EOR, ADD, SUB, SHL1, TST) \
+static void NAME(const uint8_t *buf_q, const int64_t *off_q, int64_t nq,                         \
+                 const uint8_t *buf_c, const int64_t *off_c, int64_t nc,                         \
+                 const int64_t *idx, int cnt, int32_t *out) {                                     \
+    ET table[256][LANES];                                                                         \
+    ET last[LANES], m0[LANES];                                                                    \
+    memset(table, 0, sizeof(table));                                                              \
+    for (int l = 0; l < LANES; l++) {                                                             \
+        last[l] = 0; m0[l] = 0;                                                                   \
+        if (l >= cnt) continue;                                                                   \
+        const uint8_t *c = buf_c + off_c[idx[l]];                                                 \
+        int m = (int)(off_c[idx[l] + 1] - off_c[idx[l]]);                                         \
+        for (int i = 0; i < m; i++) table[c[i]][l] |= (ET)((ET)1 << i);                           \
+        last[l] = (ET)((ET)1 << (m - 1));                                                         \
+        m0[l] = (ET)m;                                                                            \
+    }                                                                                             \
+    const VT ones = DUP((ET)~(ET)0), one = DUP((ET)1);                                            \
+    const VT L = LD(last), M0 = LD(m0);                                                           \
+    ET res[LANES];                                                                                \
+    for (int64_t q = 0; q < nq; q++) {                                                            \
+        const uint8_t *t = buf_q + off_q[q];                                                      \
+        int64_t n = off_q[q + 1] - off_q[q];                                                      \
+        VT Pv = ones, Mv = DUP((ET)0), score = M0;                                                \
+        for (int64_t j = 0; j < n; j++) {                                                         \
+            VT Eq = LD(table[t[j]]);                                                              \
+            VT Xv = ORR(Eq, Mv);                                                                  \
+            VT Xh = ORR(EOR(ADD(AND(Eq, Pv), Pv), Pv), Eq);                                       \
+            VT Ph = ORR(Mv, EOR(ORR(Xh, Pv), ones));                                              \
+            VT Mh = AND(Pv, Xh);                                                                  \
+            score = ADD(SUB(score, TST(Ph, L)), TST(Mh, L));   /* tst -> all ones = -1 */          \
+            Ph = ORR(SHL1(Ph), one);                           /* top row: +1 per column */       \
+            Mh = SHL1(Mh);                                                                        \
+            Pv = ORR(Mh, EOR(ORR(Xv, Ph), ones));                                                 \
+            Mv = AND(Ph, Xv);                                                                     \
+        }                                                                                         \
+        ST(res, score);                                                                           \
+        for (int l = 0; l < cnt; l++)                                                             \
+            out[q * nc + idx[l]] = (m0[l] == 0) ? (int32_t)n : (int32_t)res[l];                   \
+    }                                                                                             \
+}
+
+#define SHL1_16(x) vshlq_n_u16((x), 1)
+#define SHL1_32(x) vshlq_n_u32((x), 1)
+#define SHL1_64(x) vshlq_n_u64((x), 1)
+DEFINE_GROUP_KERNEL(group16, uint16x8_t, uint16_t, 8, vdupq_n_u16, vld1q_u16, vst1q_u16,
+                    vandq_u16, vorrq_u16, veorq_u16, vaddq_u16, vsubq_u16, SHL1_16, vtstq_u16)
+DEFINE_GROUP_KERNEL(group32, uint32x4_t, uint32_t, 4, vdupq_n_u32, vld1q_u32, vst1q_u32,
+                    vandq_u32, vorrq_u32, veorq_u32, vaddq_u32, vsubq_u32, SHL1_32, vtstq_u32)
+DEFINE_GROUP_KERNEL(group64, uint64x2_t, uint64_t, 2, vdupq_n_u64, vld1q_u64, vst1q_u64,
+                    vandq_u64, vorrq_u64, veorq_u64, vaddq_u64, vsubq_u64, SHL1_64, vtstq_u64)
+#endif
+
+/* Same contract as ed_cross. Returns 0, or -1 on allocation failure. */
+int ed_cross_simd(const uint8_t *buf_q, const int64_t *off_q, int64_t nq,
+                  const uint8_t *buf_c, const int64_t *off_c, int64_t nc,
+                  int32_t *out) {
+#if !defined(__ARM_NEON)
+    return ed_cross(buf_q, off_q, nq, buf_c, off_c, nc, out);
+#else
+    int64_t maxq = 0;
+    for (int64_t q = 0; q < nq; q++) {
+        int64_t l = off_q[q + 1] - off_q[q];
+        if (l > maxq) maxq = l;
+    }
+    /* Score lanes must hold max(m, n); 16-bit lanes need n < 65536. */
+    const int allow16 = maxq < 65535;
+
+    int64_t *cls[4];
+    int64_t cnt[4] = {0, 0, 0, 0};
+    for (int k = 0; k < 4; k++) {
+        cls[k] = malloc(sizeof(int64_t) * (nc ? nc : 1));
+        if (!cls[k]) { for (int z = 0; z < k; z++) free(cls[z]); return -1; }
+    }
+    for (int64_t j = 0; j < nc; j++) {
+        int64_t m = off_c[j + 1] - off_c[j];
+        int k = (m <= 16 && allow16) ? 0 : (m <= 32 ? 1 : (m <= 64 ? 2 : 3));
+        cls[k][cnt[k]++] = j;
+    }
+    for (int64_t g = 0; g < cnt[0]; g += 8)
+        group16(buf_q, off_q, nq, buf_c, off_c, nc, cls[0] + g, (int)(cnt[0] - g < 8 ? cnt[0] - g : 8), out);
+    for (int64_t g = 0; g < cnt[1]; g += 4)
+        group32(buf_q, off_q, nq, buf_c, off_c, nc, cls[1] + g, (int)(cnt[1] - g < 4 ? cnt[1] - g : 4), out);
+    for (int64_t g = 0; g < cnt[2]; g += 2)
+        group64(buf_q, off_q, nq, buf_c, off_c, nc, cls[2] + g, (int)(cnt[2] - g < 2 ? cnt[2] - g : 2), out);
+
+    int rc = 0;
+    if (cnt[3]) {   /* long candidates: scalar, candidate as pattern, loaded once */
+        int64_t mx = 0;
+        for (int64_t i = 0; i < cnt[3]; i++) {
+            int64_t m = off_c[cls[3][i] + 1] - off_c[cls[3][i]];
+            if (m > mx) mx = m;
+        }
+        ws_t ws;
+        word *Pv = NULL, *Mv = NULL;
+        if (ws_init(&ws, (int)((mx + 63) >> 6)) ||
+            !(Pv = malloc(sizeof(word) * ws.W)) || !(Mv = malloc(sizeof(word) * ws.W))) {
+            rc = -1;
+        } else {
+            for (int64_t i = 0; i < cnt[3]; i++) {
+                int64_t j = cls[3][i];
+                const uint8_t *c = buf_c + off_c[j];
+                int m = (int)(off_c[j + 1] - off_c[j]);
+                load_pattern(&ws, c, m);
+                for (int64_t q = 0; q < nq; q++)
+                    out[q * nc + j] = run_text(&ws, m, buf_q + off_q[q],
+                                               (int)(off_q[q + 1] - off_q[q]), Pv, Mv);
+                clear_pattern(&ws, c, m);
+            }
+        }
+        free(Pv); free(Mv); if (ws.peq) ws_free(&ws);
+    }
+    for (int k = 0; k < 4; k++) free(cls[k]);
+    return rc;
+#endif
+}
