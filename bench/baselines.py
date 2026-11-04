@@ -102,6 +102,10 @@ def contenders() -> tuple[list[Contender], list[str]]:
             out.append(Contender("ours.c-myers-neon", "cross", "1", both,
                                  lambda st: cmyers.cross_simd(*st),
                                  note="phase 4: candidates packed 8/4/2 per NEON register"))
+            for kk in (2, 4):
+                out.append(Contender(f"ours.c-myers-neon-k{kk}", "cross", "1", both,
+                                     (lambda k: lambda st: cmyers.cross_simd(*st, k=k))(kk),
+                                     note=f"phase 4: {kk} independent register groups interleaved"))
         out.append(Contender("ours.c-myers-trim", "pairs", "1", both,
                              lambda st: cmyers.pairs(*st, trim=True),
                              note="phase 3b ablation: plain + common prefix/suffix trimming"))
