@@ -401,10 +401,12 @@ int ed_cross_simd(const uint8_t *buf_q, const int64_t *off_q, int64_t nq,
 
 typedef struct { const uint8_t *p, *t; int lp, lt; int64_t idx; } pair_t;
 
+#if defined(__ARM_NEON)
 static int cmp_lt_desc(const void *x, const void *y) {
     int a = ((const pair_t *)x)->lt, b = ((const pair_t *)y)->lt;
     return (a < b) - (a > b);
 }
+#endif
 
 #if defined(__ARM_NEON)
 static const uint8_t ZERO_BYTE = 0;

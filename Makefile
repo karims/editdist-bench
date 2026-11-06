@@ -2,8 +2,14 @@
 CC      ?= cc
 CFLAGS  ?= -O3 -fPIC -Wall -Wextra -std=c11
 # Tune for the build machine: -mcpu=native (ARM) or -march=native (x86).
-ARCHFLAGS := $(shell $(CC) -mcpu=native -x c -c /dev/null -o /dev/null 2>/dev/null && echo -mcpu=native || \
-               ($(CC) -march=native -x c -c /dev/null -o /dev/null 2>/dev/null && echo -march=native))
+# Choose by CPU type: on x86, gcc accepts -mcpu=native but treats it as
+# -mtune only (no AVX etc.), so that flag must not be used there.
+UNAME_M := $(shell uname -m)
+ifneq ($(filter arm64 aarch64,$(UNAME_M)),)
+ARCHFLAGS := -mcpu=native
+else
+ARCHFLAGS := -march=native
+endif
 
 # One build directory per OS/arch: the Mac and its Linux VM share this folder.
 BUILD := build/$(shell uname -s)-$(shell uname -m)
