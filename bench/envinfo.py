@@ -70,5 +70,6 @@ def collect() -> dict:
         info["gpu"] = f"error: {e}"
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     info["git_commit"] = _run(["git", "-C", root, "rev-parse", "HEAD"])
-    info["git_dirty"] = bool(_run(["git", "-C", root, "status", "--porcelain"]))
+    # tracked files only: earlier results written by the same session are untracked
+    info["git_dirty"] = bool(_run(["git", "-C", root, "status", "--porcelain", "--untracked-files=no"]))
     return info
