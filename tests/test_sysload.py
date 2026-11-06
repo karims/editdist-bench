@@ -28,3 +28,9 @@ def test_full_speed_limit_is_fine():
 def test_snapshot_shape():
     s = sysload.snapshot()
     assert len(s["loadavg_1_5_15"]) == 3 and s["others_cpu_pct"] >= 0
+
+
+def test_effective_cpus_is_within_visible():
+    import os
+    n = sysload.effective_cpus()
+    assert 1 <= n <= (os.cpu_count() or 1)

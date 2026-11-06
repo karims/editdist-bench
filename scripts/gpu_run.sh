@@ -51,18 +51,28 @@ OUT="results/gpu-$GPU_NAME"
 mkdir -p "$OUT"
 RUN="$V -m bench.run_prior_art --reps 11 --out $OUT"
 
-echo "== 1/2 main comparison: GPU vs all-cores CPU (H5.1, H5.2) =="
-$RUN --threads all,gpu --lengths 16,32,64,128,256 --errors 0.05,0.2 --alphabets bytes,dna \
-     --pairs 1000000 --cross 2000 --exclude edlib,loop,expanded
+$V -c "from bench.sysload import effective_cpus as e; import os; print(f'CPUs: {os.cpu_count()} visible, {e()} allowed (multi-core libraries use {e()})')"
+
+# GPU, multi-core CPU and single-core CPU run as separate processes, so no
+# library's leftover worker threads can steal CPU time from another kind.
+GRID="--lengths 16,32,64,128,256 --errors 0.05,0.2 --alphabets bytes,dna"
+SKIP="--exclude edlib,loop,expanded"
+
+echo "== 1/2 main comparison: GPU (H5.1, H5.2) =="
+$RUN --threads gpu $GRID --pairs 1000000 --cross 2000 $SKIP
+echo "== 1/2 main comparison: all allowed CPU cores (H5.2) =="
+$RUN --threads all $GRID --pairs 1000000 --cross 2000 $SKIP
+echo "== 1/2 main comparison: one CPU core (reference, smaller batches) =="
+$RUN --threads 1 $GRID --pairs 100000 --cross 300 $SKIP
 
 echo "== 2/2 batch-size sweep: when does the GPU start to win (H5.3) =="
-for n in 1000 10000 100000 1000000; do
-  $RUN --threads all,gpu --shape pairs --lengths 32 --errors 0.05 --alphabets bytes \
-       --pairs "$n" --exclude edlib,loop,expanded
-done
-for q in 30 100 300 1000 3000; do
-  $RUN --threads all,gpu --shape cross --lengths 32 --errors 0.05 --alphabets bytes \
-       --cross "$q" --exclude edlib,loop,expanded
+for kind in gpu all; do
+  for n in 1000 10000 100000 1000000; do
+    $RUN --threads $kind --shape pairs --lengths 32 --errors 0.05 --alphabets bytes --pairs "$n" $SKIP
+  done
+  for q in 30 100 300 1000 3000; do
+    $RUN --threads $kind --shape cross --lengths 32 --errors 0.05 --alphabets bytes --cross "$q" $SKIP
+  done
 done
 
 tar czf "results-$GPU_NAME.tar.gz" "$OUT"

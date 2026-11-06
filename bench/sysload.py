@@ -16,6 +16,31 @@ def _run(cmd: list[str]) -> str:
         return ""
 
 
+def effective_cpus() -> int:
+    """CPUs this process may actually use: the smallest of the CPU affinity
+    set and the container's CPU quota (cgroup v2 cpu.max or v1 cfs quota).
+    On rented machines the quota is often far below os.cpu_count() (e.g. a
+    pod seeing 128 threads but allowed 13.6 CPUs), and libraries told to use
+    "all cores" then oversubscribe and get throttled."""
+    n = len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else (os.cpu_count() or 1)
+    quota = None
+    try:
+        q, period = open("/sys/fs/cgroup/cpu.max").read().split()[:2]
+        if q != "max":
+            quota = int(q) / int(period)
+    except (OSError, ValueError):
+        try:
+            q = int(open("/sys/fs/cgroup/cpu/cpu.cfs_quota_us").read())
+            period = int(open("/sys/fs/cgroup/cpu/cpu.cfs_period_us").read())
+            if q > 0:
+                quota = q / period
+        except (OSError, ValueError):
+            pass
+    if quota is not None:
+        n = min(n, max(1, int(quota)))
+    return max(1, n)
+
+
 def top_processes(n: int = 5) -> list[dict]:
     """Other processes by recent CPU use (%, where 100 = one full core)."""
     me = os.getpid()

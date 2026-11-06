@@ -37,6 +37,8 @@ def _flat(x) -> np.ndarray:
 
 
 def contenders() -> tuple[list[Contender], list[str]]:
+    from bench.sysload import effective_cpus
+    ncpu = effective_cpus()        # "all" = the CPUs we are allowed, not os.cpu_count()
     out: list[Contender] = []
     missing: list[str] = []
 
@@ -52,19 +54,19 @@ def contenders() -> tuple[list[Contender], list[str]]:
         ident = lambda A, B: (A, B)
         out += [
             Contender("rapidfuzz.cpdist", "pairs", "1", ident, rf_batch(process.cpdist, 1)),
-            Contender("rapidfuzz.cpdist", "pairs", "all", ident, rf_batch(process.cpdist, -1)),
+            Contender("rapidfuzz.cpdist", "pairs", "all", ident, rf_batch(process.cpdist, ncpu)),
             Contender("rapidfuzz.distance-loop", "pairs", "1", ident,
                       lambda st: [Levenshtein.distance(a, b) for a, b in zip(*st)],
                       note="one Python call per pair; measures call overhead"),
             Contender("rapidfuzz.cdist", "cross", "1", ident, rf_batch(process.cdist, 1)),
-            Contender("rapidfuzz.cdist", "cross", "all", ident, rf_batch(process.cdist, -1)),
+            Contender("rapidfuzz.cdist", "cross", "all", ident, rf_batch(process.cdist, ncpu)),
         ]
     else:
         missing.append("rapidfuzz")
 
     # ---------------- StringZilla ----------------
     if _have("stringzilla") and _have("stringzillas"):
-        sz_out, sz_missing = _stringzilla_contenders()
+        sz_out, sz_missing = _stringzilla_contenders(ncpu)
         out += sz_out
         missing += sz_missing
     else:
@@ -181,13 +183,13 @@ def stringzilla_semantics() -> str:
     raise RuntimeError(f"unrecognised StringZilla LevenshteinDistances output shape {r.shape}")
 
 
-def _stringzilla_contenders() -> tuple[list[Contender], list[str]]:
+def _stringzilla_contenders(ncpu: int) -> tuple[list[Contender], list[str]]:
     import stringzilla as sz
     import stringzillas as szs
 
     mode = stringzilla_semantics()
     out = []
-    for cores, threads in ((1, "1"), (0, "all")):
+    for cores, threads in ((1, "1"), (ncpu, "all")):
         scope = szs.DeviceScope(cpu_cores=cores)
         engine = szs.LevenshteinDistances(capabilities=scope)
         call = (lambda e, s: (lambda st: e(st[0], st[1], device=s)))(engine, scope)

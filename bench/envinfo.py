@@ -24,6 +24,11 @@ def _version(pkg: str) -> str:
         return "not installed"
 
 
+def _effective_cpus() -> int:
+    from bench.sysload import effective_cpus
+    return effective_cpus()
+
+
 def collect() -> dict:
     info = {
         "timestamp_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -31,6 +36,7 @@ def collect() -> dict:
         "machine": platform.machine(),
         "python": sys.version.split()[0],
         "logical_cpus": os.cpu_count(),
+        "effective_cpus": _effective_cpus(),
         "packages": {p: _version(p) for p in
                      ("rapidfuzz", "edlib", "stringzilla", "stringzillas-cpus",
                       "stringzillas-cuda", "cupy-cuda12x", "numpy")},
