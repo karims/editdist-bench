@@ -185,7 +185,10 @@ def main():
 
             live = []                                  # (contender, row, state, prep_s, out, inner)
             for c in group:
-                gate = _gate(c, A, B)
+                try:
+                    gate = _gate(c, A, B)
+                except Exception as e:             # a broken contender must not stop the run
+                    gate = f"ERROR({type(e).__name__}: {str(e)[:80]})"
                 row = {"bucket": bucket.name, "alphabet": bucket.alphabet,
                        "length": bucket.length, "error_rate": bucket.error_rate,
                        "shape": shape, "contender": c.name, "threads": c.threads,

@@ -64,7 +64,9 @@ def contenders() -> tuple[list[Contender], list[str]]:
 
     # ---------------- StringZilla ----------------
     if _have("stringzilla") and _have("stringzillas"):
-        out += _stringzilla_contenders()
+        sz_out, sz_missing = _stringzilla_contenders()
+        out += sz_out
+        missing += sz_missing
     else:
         missing.append("stringzilla/stringzillas")
 
@@ -179,7 +181,7 @@ def stringzilla_semantics() -> str:
     raise RuntimeError(f"unrecognised StringZilla LevenshteinDistances output shape {r.shape}")
 
 
-def _stringzilla_contenders() -> list[Contender]:
+def _stringzilla_contenders() -> tuple[list[Contender], list[str]]:
     import stringzilla as sz
     import stringzillas as szs
 
@@ -203,9 +205,25 @@ def _stringzilla_contenders() -> list[Contender]:
                 lambda A, B: (sz.Strs([a for a in A for _ in B]), sz.Strs(list(B) * len(A))),
                 call, note="4.x pairwise API fed an expanded Q*C list"))
 
+    missing: list[str] = []
+    gpu_ok = False
     if "cuda" in tuple(getattr(szs, "__capabilities__", ())):
-        gscope = szs.DeviceScope(gpu_device=0)
-        gengine = szs.LevenshteinDistances(capabilities=gscope)
+        # Probe once: on some GPUs the CUDA backend fails on every input
+        # (seen on an RTX 4090 with 5.3.2: CUDA_ERROR_INVALID_VALUE). Record
+        # that as unavailable instead of failing the whole run.
+        try:
+            gscope = szs.DeviceScope(gpu_device=0)
+            gengine = szs.LevenshteinDistances(capabilities=gscope)
+            r = np.asarray(gengine(szs.to_device(sz.Strs(["abc", "kitten"])),
+                                   szs.to_device(sz.Strs(["abd", "sitting"])), device=gscope))
+            from bench.reference import myers_distance
+            exp = [myers_distance(a, b) for a in ("abc", "kitten") for b in ("abd", "sitting")]
+            gpu_ok = r.ravel().tolist() == exp
+            if not gpu_ok:
+                missing.append(f"stringzilla.LevenshteinDistances[gpu] (wrong probe result {r.ravel().tolist()})")
+        except Exception as e:
+            missing.append(f"stringzilla.LevenshteinDistances[gpu] (fails on this GPU: {e})")
+    if gpu_ok:
         gcall = lambda st: gengine(st[0], st[1], device=gscope)
         shape = "cross" if mode == "cross" else "pairs"
         out.append(Contender(
@@ -227,7 +245,7 @@ def _stringzilla_contenders() -> list[Contender]:
             lambda A, B: [(sz.Strs([a]), sz.Strs([b])) for a, b in zip(A, B)],
             lambda st: [int(np.asarray(engine1(x, y, device=scope1)).ravel()[0]) for x, y in st],
             note="5.x has no pairwise API; one 1x1 matrix call per pair"))
-    return out
+    return out, missing
 
 
 def as_vector(result) -> np.ndarray:
