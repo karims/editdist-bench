@@ -23,12 +23,17 @@ for c in python3.12 python3.11 python3.10 python3; do
     PY="$(command -v "$c")"; break; fi
 done
 [ -n "$PY" ] || { echo "Need Python >= 3.10 (apt install python3.10-venv)" >&2; exit 1; }
-"$PY" -m venv .venv-gpu
+"$PY" -m venv --clear .venv-gpu                     # fresh every time: reruns stay clean
 V=.venv-gpu/bin/python
 $V -m pip install -q --upgrade pip
 $V -m pip install -q -r requirements.txt
-$V -m pip uninstall -q -y stringzillas-cpus          # same module name as the CUDA build
+# stringzillas-cpus and stringzillas-cuda install the same module files, so
+# removing the CPU build deletes them: force the CUDA build back in afterwards.
+$V -m pip uninstall -q -y stringzillas-cpus
 $V -m pip install -q -r requirements-gpu.txt
+$V -m pip install -q --force-reinstall --no-deps stringzillas-cuda
+$V -c "import stringzillas as s; assert 'cuda' in s.__capabilities__, s.__capabilities__" \
+  || { echo "stringzillas CUDA build not active" >&2; exit 1; }
 make PY="$V"
 
 echo "== tests (must all pass, GPU ones included) =="
