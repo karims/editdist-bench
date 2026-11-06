@@ -1,0 +1,2 @@
+bucket,alphabet,length,error_rate,shape,contender,threads,n_pairs,cells,gate,mismatches_vs_consensus,prep_s,median_s,iqr_s,inner_repeats,pairs_per_s,gcups,ns_per_pair,e2e_pairs_per_s,cpu_median_s,cpu_pairs_per_s,wall_over_cpu,checksum,note
+bytes-L32-e0.05,bytes,32,0.05,pairs,rapidfuzz.cpdist,all,10000,10239648,pass,0,4.3958e-07,3.0331e-03,7.7626e-04,13,3296914.6,3.3759,303.3,3296436.9,,,,19731,

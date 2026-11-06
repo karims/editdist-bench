@@ -1,0 +1,3 @@
+bucket,alphabet,length,error_rate,shape,contender,threads,n_pairs,cells,gate,mismatches_vs_consensus,prep_s,median_s,iqr_s,inner_repeats,pairs_per_s,gcups,ns_per_pair,e2e_pairs_per_s,cpu_median_s,cpu_pairs_per_s,wall_over_cpu,checksum,note
+bytes-L32-e0.05,bytes,32,0.05,cross,rapidfuzz.cdist,all,1000000,1023679001,pass,0,4.4052e-07,7.2505e-03,2.0596e-03,8,137921119.1,141.1870,7.3,137912740.0,,,,30970727,
+bytes-L32-e0.05,bytes,32,0.05,cross,stringzilla.LevenshteinDistances,all,1000000,1023679001,pass,0,3.6911e-05,1.1954e-02,1.3932e-03,4,83655867.9,85.6368,12.0,83398347.9,,,,30970727,

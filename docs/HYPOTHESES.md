@@ -267,3 +267,53 @@ bar and exceed 1 + 2 x relative IQR. Bar for H4.1 = 1.5x at L <= 64.
   buckets**; the exception is bytes/1% errors at 1.4x (within noise of the
   bar). Above 64 StringZilla's single thread is faster (0.7-1.0x).
 - Same caveat as before: RapidFuzz has no SIMD path on ARM.
+
+### Phase 5 — RTX 4090 (RunPod), first GPU run
+
+Sources: `results/gpu-NVIDIA-GeForce-RTX-4090/` (21 runs, 352 rows, all gates
+pass; GPU, 13-core CPU and 1-core CPU timed in separate processes; checksums
+of GPU and CPU outputs agree on every main-grid batch). Machine: AMD EPYC
+75F3, 128 threads visible but a cgroup quota of 13.6 CPUs, so multi-core
+libraries use 13 threads. An earlier attempt that let libraries start 128
+threads was throttled and is not recorded. Batches: 1,000,000 pairs,
+2,000 x 2,000 cross (1-core reference: 100,000 / 300 x 300).
+
+**H5.1 — not testable on this card.** StringZilla's CUDA backend (5.3.2,
+`kepler` path) fails every call on the RTX 4090 with
+`CUDA_ERROR_INVALID_VALUE`, even "abc" vs "abd". Needs a GPU where it runs
+(e.g. H100, the card its authors publish numbers on).
+
+**H5.2 — holds by a wide margin.** Kernel-only GPU vs the best CPU result on
+the same machine (best of 13-core and 1-core, any library or ours):
+
+| Shape | L16 | L32 | L64 | L128 | L256 |
+|---|---|---|---|---|---|
+| cross | 52-98x | 68-105x | 230-273x | 272-301x | 142-147x |
+| pairs | ~580x | ~460x | ~290x | ~300x | ~100x |
+
+Caveat: short-pair kernel-only rates (e.g. 22 G pairs/s at L16) benefit from
+the 4090's 72 MB L2 cache holding the whole repeated batch; trimming also
+removes most work at 5% errors. GCUPS counts untrimmed cells.
+
+**H5.3 — holds for cross, fails for pairs as stated, with the cause found.**
+End-to-end from Python lists (bytes, L32, 5% errors):
+
+| Batch | cross: GPU / 13-core CPU | pairs: GPU / 13-core CPU |
+|---|---|---|
+| ~1,000 | 0.08x | 2.9x |
+| ~10,000 | 0.51x | 1.2x |
+| ~90,000-100,000 | 2.9x | 0.66x |
+| ~1,000,000 | 7.6x | 0.31x |
+
+- Cross: crossover between 10,000 and 90,000 pairs, as predicted; 7.6x at
+  1M (>= 3x).
+- Pairs: 97% of the end-to-end time is converting Python strings into a
+  packed buffer in Python (400 ms for 1M pairs) versus 12.6 ms for copy to
+  GPU + compute + copy back. With packed input the GPU path runs 61-86 M
+  pairs/s (8x the 13-core CPU at 1M). The fix is packing in C (the existing
+  extension already reads Python strings in place); then re-measure.
+
+Side findings (x86, 1 core): our scalar C beats RapidFuzz's AVX2 build on
+pairs (L16: 31 vs 10 M/s, via trimming) and on everything at L >= 64, but
+RapidFuzz's AVX2 cross kernel is far ahead at L16-32 (82 vs 19 M/s) — we have
+no x86 SIMD kernel.

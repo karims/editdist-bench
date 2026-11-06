@@ -1,0 +1,3 @@
+bucket,alphabet,length,error_rate,shape,contender,threads,n_pairs,cells,gate,mismatches_vs_consensus,prep_s,median_s,iqr_s,inner_repeats,pairs_per_s,gcups,ns_per_pair,e2e_pairs_per_s,cpu_median_s,cpu_pairs_per_s,wall_over_cpu,checksum,note
+bytes-L32-e0.05,bytes,32,0.05,cross,ours.cuda-cross,gpu,90000,92198260,pass,0,2.8906e-04,2.3142e-05,8.3879e-07,950,3888958236.7,3983.9465,0.3,288271746.8,,,,2670644,"phase 5: kernel-only; inputs on the GPU, result left there"
+bytes-L32-e0.05,bytes,32,0.05,cross,ours.cuda-cross+copy,gpu,90000,92198260,pass,0,7.9290e-05,3.0239e-04,3.4282e-05,122,297624978.3,304.8945,3.4,235797161.3,,,,2670644,phase 5: includes copy to GPU and copy back
