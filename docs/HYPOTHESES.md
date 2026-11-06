@@ -245,3 +245,25 @@ run 1 of 2" wrongly used 2x as the bar. Against the registered 1.5x, on the
 first full M4 run: **cross holds at every L <= 64** (L64: 1.5-1.8x, the
 lowest cell exactly at the line), and **pairs holds at every L <= 64**
 (end-to-end L64: 1.8-2.2x). Final verdict after the second official run.
+
+### H4.1 — final verdict (two full-grid official runs on the M4)
+
+Sources: `results/macos-m4/prior_art_20261104-103035` and
+`prior_art_20261105-232901` (a day apart, after a restart). Both: 1,260 rows,
+all gates pass, 0 mismatches, committed code. Run-to-run agreement of the
+ours/library ratios: median 1.003, range 0.90-1.14.
+
+Claim rule (PROTOCOL 6.1): the lower of the two runs' ratios must clear the
+bar and exceed 1 + 2 x relative IQR. Bar for H4.1 = 1.5x at L <= 64.
+
+| Shape | L16 | L32 | L64 | L128 | L256 |
+|---|---|---|---|---|---|
+| cross (kernel), min over 12 buckets | 8.2x | 4.0x | 1.4x | 0.9x | 0.7x |
+| pairs (end-to-end), min over 12 buckets | 2.1x | 1.9x | 1.8x | 1.4x | 1.2x |
+
+- **Pairs: H4.1 holds** at every L <= 64 in every bucket (>= 1.8x), and
+  ours stays faster up to L256 (1.2-1.9x, though at L256 mostly within noise).
+- **Cross: H4.1 holds at L16 and L32** (4.0-9.6x) **and at L64 in 11 of 12
+  buckets**; the exception is bytes/1% errors at 1.4x (within noise of the
+  bar). Above 64 StringZilla's single thread is faster (0.7-1.0x).
+- Same caveat as before: RapidFuzz has no SIMD path on ARM.
