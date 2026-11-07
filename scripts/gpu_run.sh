@@ -4,7 +4,10 @@
 # archive to download:
 #
 #   git clone <repo> editdist-bench   (or unpack the tarball)
-#   cd editdist-bench && bash scripts/gpu_run.sh
+#   cd editdist-bench && bash scripts/gpu_run.sh          # full run (~45 min)
+#   cd editdist-bench && bash scripts/gpu_run.sh h100     # head-to-head with
+#        StringZilla's GPU backend + pairs re-measure (~20 min); stops within
+#        the first minutes if StringZilla's GPU backend does not work here.
 #
 # Pick a machine image with the CUDA toolkit ("CUDA devel" / PyTorch images on
 # RunPod, Lambda, Vast.ai all qualify). Plain Ubuntu also needs:
@@ -14,6 +17,8 @@
 # correctness -> main comparison -> batch-size sweep (H5.3) -> archive.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+MODE="${1:-full}"
+case "$MODE" in full|h100) ;; *) echo "usage: $0 [full|h100]" >&2; exit 1 ;; esac
 command -v nvidia-smi >/dev/null || { echo "No nvidia-smi: not an NVIDIA machine." >&2; exit 1; }
 nvidia-smi
 
@@ -52,6 +57,43 @@ mkdir -p "$OUT"
 RUN="$V -m bench.run_prior_art --reps 11 --out $OUT"
 
 $V -c "from bench.sysload import effective_cpus as e; import os; print(f'CPUs: {os.cpu_count()} visible, {e()} allowed (multi-core libraries use {e()})')"
+
+if [ "$MODE" = h100 ]; then
+  echo "== check: does StringZilla's GPU backend work on this card? =="
+  if ! $V - <<'P'
+import sys
+from bench.baselines import contenders
+cs, missing = contenders()
+ok = any(c.name.startswith("stringzilla") and c.threads == "gpu" for c in cs)
+for m in missing:
+    if "stringzilla" in m and "gpu" in m:
+        print(m)
+print("STRINGZILLA GPU:", "WORKS" if ok else "FAILS")
+sys.exit(0 if ok else 3)
+P
+  then
+    echo
+    echo "StringZilla's GPU backend does not run here either, so H5.1 cannot be tested."
+    echo "Stop the pod now to avoid charges (nothing else in this mode is needed)."
+    exit 3
+  fi
+  SKIP="--exclude edlib,loop,expanded"
+  echo "== 1/2 H5.1: our GPU kernels vs StringZilla's GPU backend (cross) =="
+  $RUN --threads gpu --shape cross --lengths 16,32,64,128,256 --errors 0.05,0.2 \
+       --alphabets bytes,dna --cross 2000 $SKIP
+  echo "== 2/2 H5.3 pairs again, now with packing in C =="
+  for kind in gpu all; do
+    for n in 1000 10000 100000 1000000; do
+      $RUN --threads $kind --shape pairs --lengths 32 --errors 0.05 --alphabets bytes --pairs "$n" $SKIP
+    done
+  done
+  $RUN --threads gpu --shape pairs --lengths 16,32,64,128,256 --errors 0.05,0.2 \
+       --alphabets bytes,dna --pairs 1000000 $SKIP
+  tar czf "results-$GPU_NAME.tar.gz" "$OUT"
+  echo
+  echo "Done. Download results-$GPU_NAME.tar.gz and unpack it into the repo on your Mac."
+  exit 0
+fi
 
 # GPU, multi-core CPU and single-core CPU run as separate processes, so no
 # library's leftover worker threads can steal CPU time from another kind.
