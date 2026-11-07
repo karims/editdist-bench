@@ -317,3 +317,50 @@ Side findings (x86, 1 core): our scalar C beats RapidFuzz's AVX2 build on
 pairs (L16: 31 vs 10 M/s, via trimming) and on everything at L >= 64, but
 RapidFuzz's AVX2 cross kernel is far ahead at L16-32 (82 vs 19 M/s) — we have
 no x86 SIMD kernel.
+
+### Phase 5 — H100 SXM (RunPod): H5.1 head-to-head and pairs with C packing
+
+Sources: `results/gpu-NVIDIA-H100-80GB-HBM3/` (10 runs, 132 rows, all gates
+pass). Intel Xeon Platinum 8480+, 224 threads visible, quota 23 CPUs.
+StringZilla 5.3.2 takes its `hopper` path here and runs. Its outputs agree
+with ours (checksums) on all 20 cross batches, and its throughput (7.3-7.7
+TCUPS at L256) matches its published H100 figure, so it was measured at
+full speed.
+
+**H5.1 — holds in this run (one run; a repeat is needed for claim grade).**
+Like for like = both return results to Python: ours `cuda-cross+copy` vs the
+better of StringZilla's two variants, 2,000 x 2,000:
+
+| Alphabet | L16 | L32 | L64 | L128 | L256 |
+|---|---|---|---|---|---|
+| bytes | 2.0-2.2x | 2.5-2.7x | 3.0-3.1x | 3.2-3.4x | 2.8-2.9x |
+| dna | 2.5x | 2.4x | 1.8-4.6x | 2.5-3.4x | 3.1x |
+
+- Bar was 1.5x at L <= 64: met in every bucket, and the lead continues
+  through L256.
+- Noisy rows: bytes L16 e0.05 (IQR 70%) and dna L64 (IQR 99-263%) do not
+  pass the 1 + 2 x IQR rule on their own; the rest do. The shared host's CPU
+  side (copies) is the noise source; kernel-only rows have IQR <= 1-2%.
+- Not like for like, recorded for completeness: our kernel-only (results left
+  on the GPU) is 4-108x StringZilla's call; StringZilla's Python API always
+  returns results to the host, so this is not a fair comparison.
+
+**H5.3 pairs, with packing in C (bytes, L32, 5% errors, vs 23 CPU cores):**
+
+| Batch | GPU end-to-end / CPU |
+|---|---|
+| 1,000 | 8.1x |
+| 10,000 | 4.6x |
+| 100,000 | 1.6x |
+| 1,000,000 | 1.2x |
+
+- Packing in C cut the host cost (e.g. 1M pairs at L32: 75 ms, was 400 ms on
+  the 4090 box), but host-side packing plus the PCIe copy still dominate:
+  GPU end-to-end is 2.4-15.9 M pairs/s across the grid while the kernel runs
+  0.09-21 G pairs/s.
+- **H5.3 fails for pairs as stated** (1.2x, not >= 3x, at 1M) and the shape
+  is opposite to the prediction: the GPU's margin is largest on small batches,
+  because RapidFuzz's multi-threaded pairs mode is slow on them.
+- Finding for the write-up: for independent pairs that start as Python
+  strings, end-to-end speed is set by moving data, not by computing; the GPU
+  pays off when data already lives on the GPU or arrives packed.
