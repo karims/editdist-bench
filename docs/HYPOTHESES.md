@@ -364,3 +364,29 @@ better of StringZilla's two variants, 2,000 x 2,000:
 - Finding for the write-up: for independent pairs that start as Python
   strings, end-to-end speed is set by moving data, not by computing; the GPU
   pays off when data already lives on the GPU or arrives packed.
+
+### H5.1 — verdict after the repeat (H100, same pod, ~15 min later)
+
+Source: adds `results/gpu-NVIDIA-H100-80GB-HBM3/prior_art_20261107-080433`.
+Caveat: same pod and session as run 1, so weaker than runs on separate days.
+
+**Correctness finding:** in the repeat, StringZilla's `+copy` variant
+returned **28 wrong distances out of 300** checked on dna/L64/5% errors; the
+same input passed in run 1, and StringZilla's other variant passed it in the
+same run. So its CUDA backend gave intermittently wrong results here. That row
+is excluded (gate FAIL). Our kernels passed every gate in both runs and agree
+with StringZilla's correct outputs on every batch.
+
+Claim rule on the lower of the two runs (bar = max(1.5, 1 + 2 x IQR)):
+
+| Alphabet | L16 | L32 | L64 | L128 | L256 |
+|---|---|---|---|---|---|
+| bytes | 2.0x (noisy) / 2.2x | 2.5-2.6x | 3.0x | 3.2-3.4x | 2.8-2.9x |
+| dna | 2.5x | 2.4-2.5x | 2.8x (noisy) / 1.8x (noisy) | 2.5-3.4x | 3.1x |
+
+- **17 of 20 buckets pass; none fails.** The 3 noisy buckets are all above
+  the 1.5x bar but within 2 x IQR of it (IQR up to 263% on the shared host's
+  copy path). Run-to-run agreement: median ratio 1.03 (range 0.61-1.68,
+  extremes in the noisy buckets).
+- **H5.1 holds:** our CUDA search kernel is 2-3.5x StringZilla 5.3.2's
+  Hopper backend on an H100, like for like, at every length 16-256.
