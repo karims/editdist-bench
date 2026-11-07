@@ -9,77 +9,135 @@ short strings (≤ 256 characters)**, on Apple Silicon (NEON) and NVIDIA GPUs
 > pairs, on one CPU core and on a GPU?
 
 **Answer, in short:** yes, for short strings. On one Apple M4 core we are
-2-10x faster than the best library at lengths 16-32. On an NVIDIA H100 our
-CUDA search kernel is 2-3.5x faster than StringZilla's GPU backend, like for
-like. The method is careful engineering of known algorithms (bit-parallel
+2-9x faster than the best library at lengths 16-32 (e.g. search at L16:
+160 vs 17 M pairs/s). On an NVIDIA H100 our CUDA search kernel is 2-3.5x
+faster than StringZilla's GPU backend, like for like (e.g. L64: 1,500 vs
+500 M pairs/s). The method is careful engineering of known algorithms (bit-parallel
 Myers, SIMD lanes, latency hiding, exact prefix/suffix trimming), not a new
 algorithm: time and space complexity are the same as Myers/Hyyrö.
 
 ## Results
 
-All numbers below are the **lower of two separate runs**, every row passed a
-correctness check against independent reference implementations, and the full
-raw data is in `results/` (never edited). Pre-registered hypotheses and their
-outcomes, including the misses: [`docs/HYPOTHESES.md`](docs/HYPOTHESES.md).
+**How to read the tables:** numbers are throughput in **millions of
+distance computations per second** (M pairs/s); higher is better. Each table
+shows one representative condition (random bytes, 5% edits) at every length;
+the other alphabets (DNA, English-like text) and error rates (1-50%) look the
+same and are in the raw CSVs. "Speedup" = ours ÷ the best library in that
+column. Every row passed a correctness check against independent reference
+implementations.
 
-Shapes: **search** = Q queries × C candidates (fuzzy search, `cdist`);
-**pairs** = N independent pairs (`cpdist`). Grid: lengths 16-256 × error
-rates 1-50% × alphabets (random bytes, DNA, English-like text).
+Two shapes are measured:
+- **Search**: Q queries × C candidates, every query against every candidate
+  (fuzzy search; RapidFuzz `cdist`).
+- **Pairs**: N independent pairs (RapidFuzz `cpdist`), timed **end to end**
+  from Python lists of strings.
 
-### 1. One CPU core, Apple M4 (macOS, official runs)
+### 1. One CPU core: Apple M4 (macOS)
 
-Ours vs the best library on one core (RapidFuzz 3.14, StringZilla 5.3, edlib):
+Official run of 2026-11-05; the run of 2026-11-04 agrees (median difference
+0.3%). Search: 200 × 200; pairs: 20,000.
 
-| Length | 16 | 32 | 64 | 128 | 256 |
+**Search**
+
+| One core, M pairs/s | L16 | L32 | L64 | L128 | L256 |
 |---|---|---|---|---|---|
-| Search (kernel) | 8.2-9.6x | 4.0-5.0x | 1.4-1.8x | 0.9-1.0x | 0.7-0.8x |
-| Pairs (end to end, from Python lists) | 2.1-2.9x | 1.9-2.5x | 1.8-2.2x | 1.4-1.9x | 1.2-1.4x |
+| RapidFuzz 3.14 (`cdist`) | 17.1 | 8.2 | 2.7 | 0.78 | 0.28 |
+| StringZilla 5.3 (`LevenshteinDistances`) | 17.0 | 10.5 | 4.0 | 1.30 | 0.48 |
+| edlib 1.3.9 (one call per pair) | 0.46 | 0.28 | 0.17 | 0.09 | 0.05 |
+| **Ours** (NEON, 4 register groups) | **159.6** | **41.4** | **5.5** | 1.12 | 0.34 |
+| **Speedup vs best library** | **9.4x** | **4.0x** | **1.4x** | 0.86x | 0.71x |
+| *For scale: StringZilla on all 10 cores* | *139.6* | *79.6* | *32.7* | *11.5* | *4.2* |
 
-- Search at L16: one M4 core (156 M pairs/s) beats StringZilla on all 10
-  cores (114 M pairs/s).
-- Above 64 characters StringZilla's single-thread search is faster (we have
-  no NEON path there).
-- Caveat: RapidFuzz has SIMD only on x86, not ARM; part of the lead on the
-  Mac is that missing port.
+**Pairs (end to end from Python lists)**
 
-On one x86 core (AMD EPYC 75F3), where RapidFuzz has its AVX2 code: our
-scalar C still wins on pairs (L16: 31 vs 10 M pairs/s, mostly from trimming)
-and on everything from L64 up, but RapidFuzz's AVX2 search is far ahead at
-L16-32 (82 vs 19 M pairs/s). We have no x86 SIMD kernel.
-
-### 2. GPU vs CPU on the same machine (RTX 4090 pod, 13 allowed CPU cores)
-
-Kernel-only GPU throughput vs the best CPU result on that machine:
-
-| Length | 16 | 32 | 64 | 128 | 256 |
+| One core, M pairs/s | L16 | L32 | L64 | L128 | L256 |
 |---|---|---|---|---|---|
-| Search | 52-98x | 68-105x | 230-273x | 272-301x | 142-147x |
-| Pairs | ~580x | ~460x | ~290x | ~300x | ~100x |
+| RapidFuzz 3.14 (`cpdist`) | 14.0 | 6.3 | 3.7 | 1.00 | 0.31 |
+| StringZilla 5.3 (one call per pair¹) | 0.70 | 0.60 | 0.48 | 0.38 | 0.22 |
+| edlib 1.3.9 (one call per pair) | 0.62 | 0.38 | 0.22 | 0.10 | 0.05 |
+| **Ours**, scalar + trimming | **41.0** | 12.0 | 4.9 | **1.48** | **0.39** |
+| **Ours**, NEON pairs | 38.8 | **13.1** | **6.9** | 1.47 | 0.38 |
+| **Speedup vs best library** | **2.9x** | **2.1x** | **1.9x** | **1.5x** | **1.3x** |
+| *For scale: RapidFuzz on all 10 cores* | *9.9* | *5.6* | *3.7* | *1.4* | *0.8* |
 
-Counting the copy of inputs to the GPU and results back (from Python
-lists):
+¹ StringZilla 5.x has no pairwise API (only query × candidate matrices), so
+each pair is a 1 × 1 matrix call; this row mostly measures call overhead.
 
-- **Search** pays off from about 10,000-90,000 pairs per batch and reaches
-  7.6x the 13-core CPU at 1M pairs.
-- **Pairs** do not: packing a million Python strings and moving them over
-  PCIe costs more than the GPU saves (1.2x the CPU at 1M pairs on an H100
-  box, even with packing done in C). For independent pairs the GPU helps
-  when the data already lives on the GPU or arrives packed.
+Notes:
+- At L16 our single core (160 M/s) is faster than StringZilla on all 10
+  cores (140 M/s). Above 64 characters StringZilla's single-thread search
+  wins: we have no NEON path there.
+- RapidFuzz has SIMD only on x86, not ARM; part of our lead on the Mac is
+  that missing port. On an x86 core (table 2) RapidFuzz's AVX2 search beats
+  ours at L16-32.
 
-### 3. GPU vs the GPU library (H100 SXM)
+### 2. GPU vs CPU on the same machine: RTX 4090 + AMD EPYC 75F3
 
-Ours vs StringZilla 5.3.2's CUDA backend (its Hopper path), both returning
-results to Python, 2,000 × 2,000 search:
+RunPod; the container is allowed 13 CPU cores. Search: 2,000 × 2,000;
+pairs: 1,000,000 (single-core rows: 300 × 300 and 100,000; throughput does
+not depend on batch size at these sizes).
 
-| Length | 16 | 32 | 64 | 128 | 256 |
+**Search**
+
+| M pairs/s | L16 | L32 | L64 | L128 | L256 |
 |---|---|---|---|---|---|
-| Ours / StringZilla | 2.0-2.5x | 2.4-2.6x | 1.8-3.0x | 2.5-3.4x | 2.8-3.1x |
+| RapidFuzz, 1 core (AVX2) | 82.4 | 35.2 | 3.2 | 0.7 | 0.2 |
+| StringZilla, 1 core | 17.4 | 9.7 | 2.9 | 0.6 | 0.2 |
+| Ours, 1 core (scalar C; no x86 SIMD) | 18.9 | 9.6 | 3.7 | 1.1 | 0.3 |
+| RapidFuzz, 13 cores | 402.7 | 201.6 | 13.1 | 3.4 | 1.2 |
+| StringZilla, 13 cores | 138.3 | 83.1 | 31.3 | 7.8 | 2.3 |
+| **Ours, GPU, compute only** (data on the GPU) | **35,171** | **21,120** | **7,805** | **2,111** | **336** |
+| **Ours, GPU, incl. copying** from Python lists | **1,712** | **1,759** | **1,337** | **875** | **273** |
+| Speedup, GPU compute only vs best CPU | 87x | 105x | 249x | 271x | 146x |
+| Speedup, GPU incl. copying vs best CPU | 4.3x | 8.7x | 43x | 112x | 119x |
 
-- 17 of 20 buckets pass the claim rule; 3 are above the bar in both runs but
-  within the noise of the shared host. None fails. The two runs were on the
-  same pod ~15 minutes apart (weaker than separate days).
-- StringZilla ran at its published speed (≈ 7.5 trillion cells/s at L256),
-  and its correct outputs match ours on every batch.
+**Pairs**
+
+| M pairs/s | L16 | L32 | L64 | L128 | L256 |
+|---|---|---|---|---|---|
+| RapidFuzz, 1 core | 10.3 | 5.3 | 3.5 | 0.9 | 0.3 |
+| Ours, 1 core (scalar + trimming) | 30.9 | 11.1 | 5.2 | 1.4 | 0.4 |
+| RapidFuzz, 13 cores | 7.3 | 7.9 | 7.1 | 3.4 | 1.1 |
+| **Ours, GPU, compute only** | **22,223** | **5,380** | **1,583** | **451** | **120** |
+| Ours, GPU, incl. copying (from packed arrays) | 79.5 | 67.0 | 58.4 | 41.3 | 22.5 |
+| Ours, GPU, end to end from Python lists² | 13.1 | 10.4 | 7.6 | 4.6 | 2.5 |
+| Speedup, GPU compute only vs best CPU | 719x | 485x | 223x | 133x | 109x |
+| Speedup, GPU end to end vs best CPU | 0.4x | 0.9x | 1.1x | 1.4x | 2.3x |
+
+² Measured on the H100 machine (table 3) after moving string packing into C;
+on this machine packing was still in Python (2.4 M/s at L16).
+
+What this means:
+- The GPU computes 100-700x faster than the best CPU result.
+- For **search** that survives the copying: 4-119x end to end. The GPU wins
+  from about 10,000-90,000 pairs per batch (smaller batches: CPU wins).
+- For **pairs** it does not: packing a million Python strings and moving
+  them to the GPU costs more than the computation. End to end, one CPU core
+  running our C code is about as fast as the GPU up to L64. The GPU pays off
+  for pairs when the data is already on the GPU or arrives packed.
+- Short-pair compute-only rates are flattered by the 4090's 72 MB cache
+  holding the repeated batch.
+
+### 3. GPU vs the GPU library: H100 SXM
+
+Ours vs StringZilla 5.3.2's CUDA backend (its H100 "Hopper" path). Both
+return results to Python, so this is like for like. Search 2,000 × 2,000;
+two runs on the same pod, ~15 minutes apart.
+
+| M pairs/s, run 1 / run 2 | L16 | L32 | L64 | L128 | L256 |
+|---|---|---|---|---|---|
+| StringZilla GPU (better of its 2 variants) | 250 / 640 | 750 / 730 | 470 / 500 | 260 / 260 | 120 / 120 |
+| **Ours, GPU** | **510 / 1,920** | **1,880 / 2,030** | **1,480 / 1,500** | **840 / 890** | **330 / 340** |
+| **Speedup** | **2.0x / 3.0x** | **2.5x / 2.8x** | **3.1x / 3.0x** | **3.2x / 3.4x** | **2.8x / 2.9x** |
+| *Ours, compute only (not like for like)* | *27,150* | *15,990* | *5,970* | *1,720* | *430* |
+
+- Across all 20 tested conditions (2 alphabets × 2 error rates × 5 lengths)
+  ours is 1.8-4.6x faster in both runs; 17 pass our claim rule, 3 are above
+  the bar but within the noise of the shared machine, none fails.
+- StringZilla ran at its published speed (about 7.5 trillion DP cells/s at
+  L256), and its correct outputs match ours on every batch.
+- The L16 column is noisy in run 1 (spread up to 70%) because of the shared
+  host's CPU, which handles the copies.
 
 ### Issues found in StringZilla 5.3.2's CUDA backend
 
