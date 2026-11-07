@@ -141,7 +141,7 @@ def contenders() -> tuple[list[Contender], list[str]]:
     from bench import cudamyers
     if cudamyers.available():
         from bench import cmyers as _cm
-        packed = lambda A, B: (_cm.pack(A), _cm.pack(B))
+        packed = lambda A, B: (_cm.pack_fast(A), _cm.pack_fast(B))   # in C when built
         out += [
             Contender("ours.cuda-pairs", "pairs", "gpu",
                       lambda A, B: cudamyers.PairsState(*packed(A, B)),
@@ -149,7 +149,7 @@ def contenders() -> tuple[list[Contender], list[str]]:
                       note="phase 5: kernel-only; inputs on the GPU, result left there"),
             Contender("ours.cuda-pairs+copy", "pairs", "gpu", packed,
                       lambda st: cudamyers.pairs(cudamyers.PairsState(*st), True).get(),
-                      note="phase 5: includes copy to GPU, class split and copy back"),
+                      note="phase 5: prep = packing in C; run = copy to GPU, class split, copy back"),
             Contender("ours.cuda-cross", "cross", "gpu",
                       lambda A, B: cudamyers.CrossState(*packed(A, B)),
                       lambda st: cudamyers.cross(st),

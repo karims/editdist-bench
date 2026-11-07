@@ -54,6 +54,15 @@ def lib():
     return _LIB
 
 
+def pack_fast(strings) -> tuple[np.ndarray, np.ndarray]:
+    """Same result as pack(), built in C by the extension (no Python loop).
+    Falls back to pack() when the extension is not built."""
+    if not ext_available():
+        return pack(strings)
+    buf, off = _load_ext().pack(strings)
+    return np.frombuffer(buf, dtype=np.uint8), np.frombuffer(off, dtype=np.int64)
+
+
 def pack(strings: list[str]) -> tuple[np.ndarray, np.ndarray]:
     """Concatenate strings into one byte buffer plus offsets (1 char = 1 byte)."""
     enc = [s.encode("latin-1") for s in strings]

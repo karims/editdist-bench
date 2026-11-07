@@ -142,7 +142,38 @@ done:
     return ret;
 }
 
+/* pack(seq) -> (buf: bytes, offsets: bytes of int64[n+1]). The same packed
+ * layout as bench.cmyers.pack, built in C straight from the str/bytes objects
+ * (one memcpy per string) instead of a Python encode/join pass. Used to feed
+ * the GPU, which needs one contiguous buffer. */
+static PyObject *py_pack(PyObject *self, PyObject *args) {
+    (void)self;
+    PyObject *obj;
+    if (!PyArg_ParseTuple(args, "O", &obj)) return NULL;
+    seq_t S;
+    if (seq_load(obj, &S) < 0) return NULL;
+    PyObject *buf = NULL, *off = NULL, *ret = NULL;
+    Py_ssize_t total = 0;
+    for (Py_ssize_t i = 0; i < S.n; i++) total += S.len[i];
+    buf = PyBytes_FromStringAndSize(NULL, total ? total : 1);   /* never empty: GPU needs a pointer */
+    off = PyBytes_FromStringAndSize(NULL, (S.n + 1) * (Py_ssize_t)sizeof(int64_t));
+    if (!buf || !off) goto done;
+    uint8_t *b = (uint8_t *)PyBytes_AS_STRING(buf);
+    int64_t *o = (int64_t *)PyBytes_AS_STRING(off);
+    if (!total) b[0] = 0;
+    o[0] = 0;
+    for (Py_ssize_t i = 0; i < S.n; i++) {
+        memcpy(b + o[i], S.ptr[i], (size_t)S.len[i]);
+        o[i + 1] = o[i] + S.len[i];
+    }
+    ret = PyTuple_Pack(2, buf, off);
+done:
+    Py_XDECREF(buf); Py_XDECREF(off); seq_free(&S);
+    return ret;
+}
+
 static PyMethodDef methods[] = {
+    {"pack", py_pack, METH_VARARGS, "pack(seq) -> (buf bytes, int64 offsets bytes)"},
     {"pairs_simd", py_pairs_simd, METH_VARARGS, "pairs_simd(a, b, out, trim=True, k=4)"},
     {"pairs", py_pairs, METH_VARARGS, "pairs(a, b, out, trim=True)"},
     {"cross", py_cross, METH_VARARGS, "cross(q, c, out)"},
