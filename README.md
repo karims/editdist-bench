@@ -236,6 +236,57 @@ two runs on the same pod, ~15 minutes apart.
 - The L16 column is noisy in run 1 (spread up to 70%) because of the shared
   host's CPU, which handles the copies.
 
+### Interpreting the results
+
+The three patterns above (GPU search strong end to end, GPU pairs weak end
+to end, our single-core search falling behind above 64 characters) all come
+down to **how much computing each result needs compared with how many bytes
+must be moved to get it**.
+
+**GPU pairs end to end (0.4-2.3x).** Every pair needs its own two strings
+moved to the GPU: about 48 bytes at L16, for only 16 steps of ~15 bit
+operations. Time per pair at L16:
+
+| Step | Time per pair |
+|---|---|
+| Our CPU core computing the whole distance | ~32 ns |
+| GPU path: packing the strings in C (one memory copy) | ~60 ns |
+| GPU path: copy to GPU + compute + copy back | ~15 ns |
+
+At L16, merely touching the strings costs more than one CPU core needs to
+compute the answer, so the GPU cannot win however fast it computes. Work
+grows faster than data as strings get longer (about L × L/64 steps vs 2L
+bytes), so the GPU's lead grows with length, slowly: 0.4x at L16 to 2.3x at
+L256.
+
+**GPU search end to end (4-119x).** Search reuses its inputs: 2,000 queries
+and 2,000 candidates (64 KB at L16) produce 4 million results. The only
+large transfer is the result matrix coming back (4 bytes per result, 16 MB).
+At short lengths that copy sets the limit (1.7 G/s end to end vs 35 G/s of
+compute); at long lengths compute dominates and the copy stops mattering
+(L256: 273 vs 336 M/s), while the CPU slows down quadratically.
+
+**Our single-core search above 64 characters (0.7-0.9x).** The NEON trick
+fits several patterns in one 128-bit register (8 × 16, 4 × 32 or 2 × 64
+characters). A 128-character pattern needs two 64-bit words, which fills the
+register with a single pattern, so we fall back to one pattern at a time.
+StringZilla keeps using vector instructions there with a different method
+(it works along the table's diagonals) and wins. This is a limit of
+NEON's 128-bit width; wider vector units (AVX-512, wider SVE) would extend
+the trick.
+
+**What would move each number (not done):**
+- Search, short strings: return distances as 1 byte instead of 4
+  (distances ≤ 255 fit), cutting the copy back by 4x; or return only matches
+  under a threshold (distance ≤ k), which is what fuzzy search usually wants.
+- GPU pairs: skip Python lists (read strings straight into a packed buffer,
+  2-bit DNA packing, overlap copying with computing). Even then a good CPU
+  core stays competitive at L16: the GPU is for search-style workloads and
+  long pairs, not short independent pairs.
+- CPU above 64 characters: interleave several long patterns across
+  registers (likely ~1.5x); beating StringZilla there probably needs a
+  diagonal-wise method.
+
 ### Issues found in StringZilla 5.3.2's CUDA backend
 
 - **RTX 4090 (Ada, sm_89):** every call fails with
