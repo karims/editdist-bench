@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "Fast exact edit distance (Levenshtein) for batches of short strings: bit-parallel CPU (NEON) and NVIDIA GPU (CUDA)"
 readme = "README.md"
 requires-python = ">=3.10"
+license = { file = "LICENSE" }
 dependencies = ["numpy>=1.24"]
 
 [project.optional-dependencies]

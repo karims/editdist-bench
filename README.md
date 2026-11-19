@@ -419,3 +419,7 @@ results/               raw benchmark output, by machine
 - Single-core CPU numbers; GPU numbers from rented, shared machines.
 - Synthetic data (random bytes, DNA, English-like text with controlled edit
   rates).
+
+## License
+
+MIT, see [LICENSE](LICENSE).
