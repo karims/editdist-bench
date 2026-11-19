@@ -26,6 +26,10 @@ class Contender:
     prepare: Callable[[list[str], list[str]], Any]
     run: Callable[[Any], Any]
     note: str = ""
+    # For contenders whose output is a declared transformation of the exact
+    # distances (thresholded, saturated): maps exact distances -> expected
+    # output. Used by the correctness gate and the consensus check.
+    expect: Callable[[np.ndarray], np.ndarray] | None = None
 
 
 def _have(mod: str) -> bool:
@@ -157,6 +161,14 @@ def contenders() -> tuple[list[Contender], list[str]]:
             Contender("ours.cuda-cross+copy", "cross", "gpu", packed,
                       lambda st: cudamyers.cross(cudamyers.CrossState(*st)).get(),
                       note="phase 5: includes copy to GPU and copy back"),
+            Contender("ours.cuda-cross+copy-u8", "cross", "gpu", packed,
+                      lambda st: cudamyers.cross(cudamyers.CrossState(*st), -1, True).get(),
+                      note="as +copy, results as 1 byte (saturating at 255)",
+                      expect=lambda d: np.minimum(d, 255)),
+            Contender("ours.cuda-cross+copy-k3-u8", "cross", "gpu", packed,
+                      lambda st: cudamyers.cross(cudamyers.CrossState(*st), 3, True).get(),
+                      note="as +copy-u8 with max distance 3: output min(d, 4)",
+                      expect=lambda d: np.minimum(d, 4)),
         ]
     else:
         missing.append("ours.cuda-* (no NVIDIA GPU or CuPy)")

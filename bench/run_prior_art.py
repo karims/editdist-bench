@@ -76,6 +76,8 @@ def _gate(c, A, B):
         qa, cb = A[:15], B[:20]
         got = as_vector(c.run(c.prepare(qa, cb)))
         exp = np.array([myers_distance(a, b) for a in qa for b in cb])
+    if c.expect is not None:
+        exp = c.expect(exp)
     return "pass" if np.array_equal(got, exp) else f"FAIL({int((got != exp).sum())})"
 
 
@@ -230,13 +232,13 @@ def main():
                         w_, c_, k_ = _sample(c.run, state, inner)
                         walls[i].append(w_); cpus[i].append(c_); sinks[i] += k_
 
-            consensus = None
+            # consensus = the first contender that returns exact distances
+            consensus = next((as_vector(x[4]) for x in live if x[0].expect is None), None)
             for i, (c, row, state, prep_s, out, inner) in enumerate(live):
                 med, iqr = statistics.median(walls[i]), _iqr(walls[i])
                 vec = as_vector(out)
-                if consensus is None:
-                    consensus = vec
-                mism = int((vec != consensus).sum())
+                ref_vec = consensus if consensus is not None else vec
+                mism = int((vec != (c.expect(ref_vec) if c.expect else ref_vec)).sum())
                 row.update({
                     "mismatches_vs_consensus": mism,
                     "prep_s": f"{prep_s:.4e}", "median_s": f"{med:.4e}", "iqr_s": f"{iqr:.4e}",

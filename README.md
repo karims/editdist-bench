@@ -16,6 +16,47 @@ faster than StringZilla's GPU backend, like for like (e.g. L64: 1,500 vs
 Myers, SIMD lanes, latency hiding, exact prefix/suffix trimming), not a new
 algorithm: time and space complexity are the same as Myers/Hyyrö.
 
+## Use it: the `bitlev` library
+
+The kernels are packaged as a small Python library, `bitlev` (same C core as
+the benchmark):
+
+```bash
+pip install "bitlev @ git+https://github.com/karims/editdist-bench"          # CPU
+pip install "bitlev[gpu] @ git+https://github.com/karims/editdist-bench"     # + NVIDIA GPU (CuPy)
+```
+
+```python
+import bitlev
+bitlev.distance("kitten", "sitting")                     # 3
+bitlev.pairwise(["abc", "kitten"], ["abd", "sitting"])   # array([1, 3])
+bitlev.cdist(queries, choices)                           # len(queries) x len(choices), int32
+bitlev.cdist(queries, choices, max_dist=2, dtype="uint8")  # "within 2 edits?" -> 0, 1, 2 or 3
+
+from bitlev import gpu                                   # NVIDIA GPU
+gpu.cdist(queries, choices, max_dist=2, dtype="uint8")
+```
+
+- **Inputs:** `str` whose characters are all ≤ U+00FF (ASCII, Latin-1) or
+  `bytes`; distances are counted in bytes. For other text, encode first
+  (e.g. UTF-8).
+- **`max_dist=k`** returns min(distance, k + 1). Pairs whose lengths differ
+  by more than k, or that can no longer come back under k, stop early: on
+  longer or uneven strings this is several times faster (up to ~6x at 128
+  characters on the M4); on short equal-length strings the result is just
+  capped.
+- **`dtype`**: int32 (default), uint16 or uint8; narrower types saturate.
+  On the GPU, uint8 cuts the copy of results back to the CPU by 4x, which
+  is the main cost for short strings.
+- **`method="auto"`** picks NEON or the scalar path per call from measured
+  crossovers; `"simd"` and `"scalar"` force one.
+- **GPU** (`bitlev.gpu`): same API plus `return_device=True` to keep results
+  on the GPU. Worth it for search-style `cdist` calls from ~10^4-10^5 results
+  upward; for many short independent pairs a CPU core is usually as fast
+  (see Results).
+- Single-threaded on the CPU. Portable build by default;
+  `BITLEV_NATIVE=1 pip install ...` tunes for the build machine.
+
 ## The algorithm
 
 **Problem.** The edit (Levenshtein) distance between strings *a* (length *m*)
@@ -360,6 +401,8 @@ bench/cmyers.py        Python bindings for the CPU kernels
 bench/cudamyers.py     Python bindings for the GPU kernels
 bench/run_prior_art.py benchmark runner -> results/*.csv + .env.json
 bench/envinfo.py       environment capture; bench/sysload.py machine load, CPU quota
+bitlev/                the library: CPU API (__init__.py) and GPU API (gpu.py)
+setup.py, pyproject.toml  builds bitlev (C extension + CUDA sources as package data)
 scripts/               official macOS run, GPU run, jitter probe
 tests/                 ~200 tests (GPU ones skip without a GPU)
 results/               raw benchmark output, by machine
@@ -368,7 +411,10 @@ results/               raw benchmark output, by machine
 ## Limits
 
 - Score only (no alignment/traceback), unit costs, byte alphabet.
-- No early exit for a distance threshold ("≤ k?"), which many real users want.
+- The threshold (`max_dist`) and 1-byte output were added after the
+  benchmark runs above; their CPU speed is measured on the M4 (see the
+  library section), their GPU speed is not measured yet.
+- The library is single-threaded on the CPU.
 - No SIMD path above 64 characters on the CPU, and no x86 SIMD kernel.
 - Single-core CPU numbers; GPU numbers from rented, shared machines.
 - Synthetic data (random bytes, DNA, English-like text with controlled edit

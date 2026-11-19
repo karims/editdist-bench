@@ -1,0 +1,2 @@
+include csrc/*.c csrc/*.cu csrc/*.cuh
+include README.md

@@ -48,6 +48,7 @@ rm -rf "$VENV"
 
 # 4. Build the C kernels and the CPython extension for this interpreter.
 make PY="$VENV/bin/python"
+"$VENV/bin/python" -m pip install -q -e .        # the bitlev library (same C core)
 
 # 5. Correctness before anything else.
 "$VENV/bin/python" -m pytest -q

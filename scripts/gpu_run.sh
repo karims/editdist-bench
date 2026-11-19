@@ -8,6 +8,8 @@
 #   cd editdist-bench && bash scripts/gpu_run.sh h100     # head-to-head with
 #        StringZilla's GPU backend + pairs re-measure (~20 min); stops within
 #        the first minutes if StringZilla's GPU backend does not work here.
+#   cd editdist-bench && bash scripts/gpu_run.sh lib      # bitlev.gpu tests +
+#        1-byte output and threshold measurements (~10 min)
 #
 # Pick a machine image with the CUDA toolkit ("CUDA devel" / PyTorch images on
 # RunPod, Lambda, Vast.ai all qualify). Plain Ubuntu also needs:
@@ -18,7 +20,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 MODE="${1:-full}"
-case "$MODE" in full|h100) ;; *) echo "usage: $0 [full|h100]" >&2; exit 1 ;; esac
+case "$MODE" in full|h100|lib) ;; *) echo "usage: $0 [full|h100|lib]" >&2; exit 1 ;; esac
 command -v nvidia-smi >/dev/null || { echo "No nvidia-smi: not an NVIDIA machine." >&2; exit 1; }
 nvidia-smi
 
@@ -40,6 +42,7 @@ $V -m pip install -q --force-reinstall --no-deps stringzillas-cuda
 $V -c "import stringzillas as s; assert 'cuda' in s.__capabilities__, s.__capabilities__" \
   || { echo "stringzillas CUDA build not active" >&2; exit 1; }
 make PY="$V"
+$V -m pip install -q -e .                          # the bitlev library, incl. bitlev.gpu
 
 echo "== tests (must all pass, GPU ones included) =="
 $V -m pytest -q
@@ -57,6 +60,17 @@ mkdir -p "$OUT"
 RUN="$V -m bench.run_prior_art --reps 11 --out $OUT"
 
 $V -c "from bench.sysload import effective_cpus as e; import os; print(f'CPUs: {os.cpu_count()} visible, {e()} allowed (multi-core libraries use {e()})')"
+
+if [ "$MODE" = lib ]; then
+  SKIP="--exclude edlib,loop,expanded"
+  echo "== lib: 1-byte output and threshold on the GPU, search shape =="
+  $RUN --threads gpu --shape cross --lengths 16,32,64,128,256 --errors 0.05 \
+       --alphabets bytes --cross 2000 --only ours.cuda-cross $SKIP
+  tar czf "results-$GPU_NAME.tar.gz" "$OUT"
+  echo
+  echo "Done. Download results-$GPU_NAME.tar.gz and unpack it into the repo on your Mac."
+  exit 0
+fi
 
 if [ "$MODE" = h100 ]; then
   echo "== check: does StringZilla's GPU backend work on this card? =="

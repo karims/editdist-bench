@@ -223,7 +223,13 @@ done:
     return ret;
 }
 
+static PyObject *py_simd_available(PyObject *self, PyObject *args) {
+    (void)self; (void)args;
+    return PyBool_FromLong(ed_simd_available());
+}
+
 static PyMethodDef methods[] = {
+    {"simd_available", py_simd_available, METH_NOARGS, "True if NEON kernels are compiled in"},
     {"pack", py_pack, METH_VARARGS, "pack(seq) -> (buf bytes, int64 offsets bytes)"},
     {"pairs_simd", py_pairs_simd, METH_VARARGS, "pairs_simd(a, b, out, trim=True, k=4)"},
     {"pairs", py_pairs, METH_VARARGS, "pairs(a, b, out, trim=True, k=-1)"},
