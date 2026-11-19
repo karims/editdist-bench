@@ -20,18 +20,19 @@ def lib():
     for f in (L.gpu_pair_distance_host, L.gpu_peq_distance_host):
         f.restype = ctypes.c_int
     L.gpu_pair_distance_host.argtypes = [ctypes.c_char_p, ctypes.c_int,
-                                         ctypes.c_char_p, ctypes.c_int, ctypes.c_int]
+                                         ctypes.c_char_p, ctypes.c_int, ctypes.c_int, ctypes.c_int]
     L.gpu_peq_distance_host.argtypes = [ctypes.c_char_p, ctypes.c_int,
-                                        ctypes.c_char_p, ctypes.c_int]
+                                        ctypes.c_char_p, ctypes.c_int, ctypes.c_int]
+    L.gpu_store8_host.argtypes = [ctypes.c_int]
     return L
 
 
-def swar(L, a: bytes, b: bytes, trim=1):
-    return L.gpu_pair_distance_host(a, len(a), b, len(b), trim)
+def swar(L, a: bytes, b: bytes, trim=1, k=-1):
+    return L.gpu_pair_distance_host(a, len(a), b, len(b), trim, k)
 
 
-def peq(L, a: bytes, b: bytes):
-    return L.gpu_peq_distance_host(a, len(a), b, len(b))
+def peq(L, a: bytes, b: bytes, k=-1):
+    return L.gpu_peq_distance_host(a, len(a), b, len(b), k)
 
 
 def ref(a: bytes, b: bytes):
@@ -93,3 +94,29 @@ def test_benchmark_data(lib, L, e, alph):
         for c in C:
             q_, c_ = q.encode("latin-1"), c.encode("latin-1")
             assert peq(lib, q_, c_) == ref(q_, c_)
+
+
+@pytest.mark.parametrize("k", [0, 1, 2, 5, 17, 100])
+def test_threshold(lib, k):
+    """k >= 0: result is min(distance, k + 1), with early exits."""
+    rng = random.Random(k)
+    for _ in range(400):
+        m = rng.randrange(0, 260)
+        a = bytes(rng.choice(b"ACGT\x00") for _ in range(m))
+        b = bytearray(a)
+        for _ in range(rng.randrange(0, 15)):
+            i = rng.randrange(len(b) + 1)
+            op = rng.randrange(3)
+            if op == 0 and i < len(b): b[i] = rng.choice(b"ACGT")
+            elif op == 1: b.insert(i, rng.choice(b"ACGT"))
+            elif i < len(b): del b[i]
+        b = bytes(b)
+        want = min(ref(a, b), k + 1)
+        if min(len(a), len(b)) <= 256:
+            assert swar(lib, a, b, 1, k) == want and swar(lib, a, b, 0, k) == want
+        if len(a) <= 512:
+            assert peq(lib, a, b, k) == want
+
+
+def test_byte_output_saturates(lib):
+    assert [lib.gpu_store8_host(d) for d in (0, 7, 254, 255, 256, 9999)] == [0, 7, 254, 255, 255, 255]

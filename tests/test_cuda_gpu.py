@@ -54,3 +54,23 @@ def test_cross_long_and_empty_queries():
     Q = ["", "a" * 64, "b" * 65, "c" * 512, "d" * 513, "abc"]
     C = ["", "aaa", "b" * 70, "c" * 500, "xyz"]
     np.testing.assert_array_equal(gpu_cross(Q, C), cmyers.cross(cmyers.pack(Q), cmyers.pack(C)))
+
+
+@pytest.mark.parametrize("k", [0, 2, 10])
+def test_threshold_and_byte_output(k):
+    P = make_pairs(Bucket(64, 0.2, "dna"), 2000, 9) + make_pairs(Bucket(256, 0.5, "bytes"), 300, 9)
+    A, B = [p[0] for p in P] + ["x" * 300], [p[1] for p in P] + ["y" * 280]   # one CPU-fallback pair
+    exact = cmyers.pairs(cmyers.pack(A), cmyers.pack(B))
+    st = cudamyers.PairsState(cmyers.pack(A), cmyers.pack(B))
+    np.testing.assert_array_equal(cudamyers.pairs(st, True, k).get(), np.minimum(exact, k + 1))
+    got8 = cudamyers.pairs(st, True, -1, True).get()
+    assert got8.dtype == np.uint8
+    np.testing.assert_array_equal(got8, np.minimum(exact, 255))
+    Q, C = make_cross(Bucket(32, 0.2, "bytes"), 40, 700, 9)
+    Q = Q + ["q" * 600]                                                          # CPU-fallback query
+    ex = cmyers.cross(cmyers.pack(Q), cmyers.pack(C)).ravel()
+    cs = cudamyers.CrossState(cmyers.pack(Q), cmyers.pack(C))
+    np.testing.assert_array_equal(cudamyers.cross(cs, k).get(), np.minimum(ex, k + 1))
+    g8 = cudamyers.cross(cs, k, True).get()
+    assert g8.dtype == np.uint8
+    np.testing.assert_array_equal(g8, np.minimum(np.minimum(ex, k + 1), 255))

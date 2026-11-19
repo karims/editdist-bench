@@ -29,6 +29,8 @@ def _lib():
     lib.ed_pairs.argtypes = [_P_U8, _P_I64, _P_U8, _P_I64, ctypes.c_int64, _P_I32]
     lib.ed_pairs.restype = ctypes.c_int
     lib.ed_pairs_opt.argtypes = [_P_U8, _P_I64, _P_U8, _P_I64, ctypes.c_int64, _P_I32, ctypes.c_int]
+    lib.ed_pairs_k.argtypes = lib.ed_pairs_opt.argtypes + [ctypes.c_int]
+    lib.ed_pairs_k.restype = ctypes.c_int
     lib.ed_pairs_opt.restype = ctypes.c_int
     lib.ed_cross.argtypes = [_P_U8, _P_I64, ctypes.c_int64, _P_U8, _P_I64, ctypes.c_int64, _P_I32]
     lib.ed_cross.restype = ctypes.c_int
@@ -70,6 +72,16 @@ def pack(strings: list[str]) -> tuple[np.ndarray, np.ndarray]:
     np.cumsum([len(e) for e in enc], out=off[1:])
     buf = np.frombuffer(b"".join(enc) or b"\0", dtype=np.uint8).copy()
     return buf, off
+
+
+def pairs_k(packed_a, packed_b, k: int, trim: bool = True) -> np.ndarray:
+    """Thresholded distances: min(distance, k + 1), with early exits."""
+    (ba, oa), (bb, ob) = packed_a, packed_b
+    n = len(oa) - 1
+    out = np.empty(n, dtype=np.int32)
+    if lib().ed_pairs_k(ba, oa, bb, ob, n, out, int(trim), int(k)) != 0:
+        raise MemoryError("ed_pairs_k allocation failed")
+    return out
 
 
 def pairs(packed_a, packed_b, trim: bool = False) -> np.ndarray:

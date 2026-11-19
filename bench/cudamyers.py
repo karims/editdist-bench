@@ -91,24 +91,47 @@ class PairsState:
         self.b = tuple(cp.asarray(x) for x in packed_b)
         groups, self.rest = pair_classes(packed_a[1], packed_b[1])
         self.groups = [(cap, cp.asarray(g), len(g)) for cap, g in zip(PAIR_CAPS, groups) if len(g)]
+        self._rest_cache = {}
         if len(self.rest):
-            from bench import cmyers
-            self.rest_vals = cp.asarray(cmyers.pairs(_subset(packed_a, self.rest),
-                                                     _subset(packed_b, self.rest), trim=True))
+            self.rest_a = _subset(packed_a, self.rest)
+            self.rest_b = _subset(packed_b, self.rest)
             self.rest_idx = cp.asarray(self.rest.astype(np.int64))
 
+    def rest_values(self, k: int):
+        """Pairs longer than 256: computed once on the CPU (per threshold)."""
+        if k not in self._rest_cache:
+            import cupy as cp
+            from bench import cmyers
+            vals = (cmyers.pairs(self.rest_a, self.rest_b, trim=True) if k < 0
+                    else cmyers.pairs_k(self.rest_a, self.rest_b, k))
+            self._rest_cache[k] = cp.asarray(vals)
+        return self._rest_cache[k]
 
-def pairs(st: PairsState, trim: bool = True):
-    """Distances on the GPU; returns a CuPy int32 array (still on the GPU)."""
+
+def _out(n: int, out8: bool):
     import cupy as cp
+    return cp.empty(n, dtype=cp.uint8 if out8 else cp.int32)
+
+
+def _finish(out, idx, vals, out8):
+    if out8:
+        import cupy as cp
+        vals = cp.minimum(vals, 255).astype(cp.uint8)
+    out[idx] = vals
+
+
+def pairs(st: PairsState, trim: bool = True, k: int = -1, out8: bool = False):
+    """Distances on the GPU; returns a CuPy array (still on the GPU): int32,
+    or uint8 saturating at 255 with out8. k >= 0: min(distance, k + 1)."""
     mod = _module()
-    out = cp.empty(st.n, dtype=cp.int32)
+    out = _out(st.n, out8)
     for cap, idx, cnt in st.groups:
         mod.get_function(f"ed_pairs_c{cap}")(
             ((cnt + THREADS - 1) // THREADS,), (THREADS,),
-            (st.a[0], st.a[1], st.b[0], st.b[1], idx, np.int32(cnt), out, np.int32(int(trim))))
+            (st.a[0], st.a[1], st.b[0], st.b[1], idx, np.int32(cnt), out,
+             np.int32(int(trim)), np.int32(k), np.int32(int(out8))))
     if len(st.rest):
-        out[st.rest_idx] = st.rest_vals          # > 256: computed once on the CPU
+        _finish(out, st.rest_idx, st.rest_values(k), out8)
     sync()
     return out
 
@@ -128,19 +151,24 @@ class CrossState:
             self.rest_idx = cp.asarray(self.rest.astype(np.int64))
 
 
-def cross(st: CrossState):
-    """nq x nc distances (row-major, flat) as a CuPy int32 array on the GPU."""
+def cross(st: CrossState, k: int = -1, out8: bool = False):
+    """nq x nc distances (row-major, flat) as a CuPy array on the GPU: int32,
+    or uint8 saturating at 255 with out8. k >= 0: min(distance, k + 1)."""
     import cupy as cp
     mod = _module()
-    out = cp.empty(st.nq * st.nc, dtype=cp.int32)
+    out = _out(st.nq * st.nc, out8)
     # enough candidate-blocks per query to cover nc, capped so the grid stays sane
     gy = max(1, min((st.nc + THREADS - 1) // THREADS, 64))
     for nw, idx, cnt in st.groups:
         mod.get_function(f"ed_cross_w{nw}")(
             (cnt, gy), (THREADS,),
-            (st.q[0], st.q[1], idx, st.c[0], st.c[1], np.int32(st.nc), out),
+            (st.q[0], st.q[1], idx, st.c[0], st.c[1], np.int32(st.nc), out,
+             np.int32(k), np.int32(int(out8))),
             shared_mem=256 * nw * 8)
     if len(st.rest):
-        out.reshape(st.nq, st.nc)[st.rest_idx] = st.rest_vals
+        vals = st.rest_vals if k < 0 else cp.minimum(st.rest_vals, k + 1)
+        if out8:
+            vals = cp.minimum(vals, 255).astype(cp.uint8)
+        out.reshape(st.nq, st.nc)[st.rest_idx] = vals
     sync()
     return out

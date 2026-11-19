@@ -71,13 +71,14 @@ HD void trim_affix(const u8 *&a, int &la, const u8 *&b, int &lb) {
  * 16, 32, 64, 128, 256). The pattern is held in registers: all loops over it
  * are fully unrolled with compile-time indices, so nothing spills to memory. */
 template <int CAP>
-HD int pair_distance_swar(const u8 *a, int la, const u8 *b, int lb, int trim) {
+HD int pair_distance_swar(const u8 *a, int la, const u8 *b, int lb, int trim, int k = -1) {
     typedef typename pick<(CAP <= 32), u32, u64>::type T;
     constexpr int BITS = 8 * (int)sizeof(T);
     constexpr int NW = (CAP + BITS - 1) / BITS;      /* Myers words */
     constexpr int NP = CAP / 4;                      /* packed pattern u32s */
     if (trim) trim_affix(a, la, b, lb);
     if (la > lb) { const u8 *t = a; a = b; b = t; int x = la; la = lb; lb = x; }
+    if (k >= 0 && lb - la > k) return k + 1;          /* length gap alone exceeds k */
     if (la == 0) return lb;
 
     u32 pw[NP];
@@ -112,6 +113,7 @@ HD int pair_distance_swar(const u8 *a, int la, const u8 *b, int lb, int trim) {
                 else score += block_step<T>(Pv[w], Mv[w], Eq, h, lastbit);
             }
         }
+        if (k >= 0 && score - (lb - 1 - j) > k) return k + 1;   /* cannot come back under k */
     }
     return score;
 }
@@ -120,7 +122,8 @@ HD int pair_distance_swar(const u8 *a, int la, const u8 *b, int lb, int trim) {
  * NW u64 words, laid out peq[c * NW + w]) and a text. Pattern length m >= 1,
  * m <= 64 * NW. Used by the cross kernel with peq in shared memory. */
 template <int NW>
-HD int text_distance_peq(const u64 *peq, int m, const u8 *t, int n) {
+HD int text_distance_peq(const u64 *peq, int m, const u8 *t, int n, int k = -1) {
+    if (k >= 0 && (n > m ? n - m : m - n) > k) return k + 1;
     u64 Pv[NW], Mv[NW];
 #pragma unroll
     for (int w = 0; w < NW; w++) { Pv[w] = ~0ull; Mv[w] = 0; }
@@ -136,8 +139,16 @@ HD int text_distance_peq(const u64 *peq, int m, const u8 *t, int n) {
                 else score += block_step<u64>(Pv[w], Mv[w], row[w], h, lastbit);
             }
         }
+        if (k >= 0 && score - (n - 1 - j) > k) return k + 1;
     }
     return score;
+}
+
+/* Store a result as int32, or as one byte saturating at 255 (distances of
+ * short strings fit; with a threshold k <= 254 the value is exact). */
+HD void store_result(void *out, long long i, int d, int out8) {
+    if (out8) ((u8 *)out)[i] = (u8)(d > 255 ? 255 : d);
+    else ((int *)out)[i] = d;
 }
 
 /* Capacity class for a pair: smallest CAP >= the shorter length, or -1 if

@@ -54,11 +54,12 @@ static int seq_load(PyObject *obj, seq_t *s) {
     return 0;
 }
 
-/* pairs(a_list, b_list, out: writable int32 buffer, trim: int) */
+/* pairs(a_list, b_list, out: writable int32 buffer, trim=True, k=-1)
+ * k >= 0: threshold, result = min(distance, k + 1). */
 static PyObject *py_pairs(PyObject *self, PyObject *args) {
     (void)self;
-    PyObject *oa, *ob; Py_buffer out; int trim = 1;
-    if (!PyArg_ParseTuple(args, "OOw*|p", &oa, &ob, &out, &trim)) return NULL;
+    PyObject *oa, *ob; Py_buffer out; int trim = 1, k = -1;
+    if (!PyArg_ParseTuple(args, "OOw*|pi", &oa, &ob, &out, &trim, &k)) return NULL;
     seq_t A, B;
     if (seq_load(oa, &A) < 0) { PyBuffer_Release(&out); return NULL; }
     if (seq_load(ob, &B) < 0) { seq_free(&A); PyBuffer_Release(&out); return NULL; }
@@ -78,7 +79,7 @@ static PyObject *py_pairs(PyObject *self, PyObject *args) {
     if (!Pv || !Mv) { free(Pv); free(Mv); ws_free(&ws); PyErr_NoMemory(); goto done; }
     int32_t *o = (int32_t *)out.buf;
     for (Py_ssize_t i = 0; i < A.n; i++)
-        o[i] = pair_distance(&ws, Pv, Mv, A.ptr[i], A.len[i], B.ptr[i], B.len[i], trim);
+        o[i] = pair_distance_k(&ws, Pv, Mv, A.ptr[i], A.len[i], B.ptr[i], B.len[i], trim, k);
     free(Pv); free(Mv); ws_free(&ws);
     ret = Py_None; Py_INCREF(ret);
 done:
@@ -86,11 +87,11 @@ done:
     return ret;
 }
 
-/* cross(q_list, c_list, out: writable int32 buffer of len(q)*len(c)) */
+/* cross(q_list, c_list, out: writable int32 buffer of len(q)*len(c), k=-1) */
 static PyObject *py_cross(PyObject *self, PyObject *args) {
     (void)self;
-    PyObject *oq, *oc; Py_buffer out;
-    if (!PyArg_ParseTuple(args, "OOw*", &oq, &oc, &out)) return NULL;
+    PyObject *oq, *oc; Py_buffer out; int k = -1;
+    if (!PyArg_ParseTuple(args, "OOw*|i", &oq, &oc, &out, &k)) return NULL;
     seq_t Q, C;
     if (seq_load(oq, &Q) < 0) { PyBuffer_Release(&out); return NULL; }
     if (seq_load(oc, &C) < 0) { seq_free(&Q); PyBuffer_Release(&out); return NULL; }
@@ -107,10 +108,15 @@ static PyObject *py_cross(PyObject *self, PyObject *args) {
     int32_t *o = (int32_t *)out.buf;
     for (Py_ssize_t i = 0; i < Q.n; i++) {
         int32_t *row = o + i * C.n;
-        if (Q.len[i] == 0) { for (Py_ssize_t j = 0; j < C.n; j++) row[j] = C.len[j]; continue; }
+        if (Q.len[i] == 0) {
+            for (Py_ssize_t j = 0; j < C.n; j++)
+                row[j] = (k >= 0 && C.len[j] > k) ? k + 1 : C.len[j];
+            continue;
+        }
         load_pattern(&ws, Q.ptr[i], Q.len[i]);
         for (Py_ssize_t j = 0; j < C.n; j++)
-            row[j] = run_text(&ws, Q.len[i], C.ptr[j], C.len[j], Pv, Mv);
+            row[j] = k < 0 ? run_text(&ws, Q.len[i], C.ptr[j], C.len[j], Pv, Mv)
+                           : run_text_k(&ws, Q.len[i], C.ptr[j], C.len[j], Pv, Mv, k);
         clear_pattern(&ws, Q.ptr[i], Q.len[i]);
     }
     free(Pv); free(Mv); ws_free(&ws);
@@ -139,6 +145,51 @@ static PyObject *py_pairs_simd(PyObject *self, PyObject *args) {
     ret = Py_None; Py_INCREF(ret);
 done:
     seq_free(&A); seq_free(&B); PyBuffer_Release(&out);
+    return ret;
+}
+
+/* Copy a loaded sequence into one buffer + int64 offsets (caller frees). */
+static int seq_pack(const seq_t *S, uint8_t **buf, int64_t **off) {
+    int64_t total = 0;
+    for (Py_ssize_t i = 0; i < S->n; i++) total += S->len[i];
+    *buf = malloc((size_t)(total ? total : 1));
+    *off = malloc(sizeof(int64_t) * (size_t)(S->n + 1));
+    if (!*buf || !*off) { free(*buf); free(*off); return -1; }
+    (*off)[0] = 0;
+    for (Py_ssize_t i = 0; i < S->n; i++) {
+        memcpy(*buf + (*off)[i], S->ptr[i], (size_t)S->len[i]);
+        (*off)[i + 1] = (*off)[i] + S->len[i];
+    }
+    return 0;
+}
+
+/* cross_simd(q_list, c_list, out, groups=4, k=-1): NEON cross kernel straight
+ * from Python lists (packs internally); scalar kernel without NEON. With
+ * k >= 0 the results are capped to k + 1 (no early exit on this path). */
+static PyObject *py_cross_simd(PyObject *self, PyObject *args) {
+    (void)self;
+    PyObject *oq, *oc; Py_buffer out; int groups = 4, k = -1;
+    if (!PyArg_ParseTuple(args, "OOw*|ii", &oq, &oc, &out, &groups, &k)) return NULL;
+    seq_t Q, C;
+    if (seq_load(oq, &Q) < 0) { PyBuffer_Release(&out); return NULL; }
+    if (seq_load(oc, &C) < 0) { seq_free(&Q); PyBuffer_Release(&out); return NULL; }
+    PyObject *ret = NULL;
+    uint8_t *bq = NULL, *bc = NULL; int64_t *oq_ = NULL, *oc_ = NULL;
+    if (out.len < (Py_ssize_t)(Q.n * C.n * sizeof(int32_t))) {
+        PyErr_SetString(PyExc_ValueError, "output buffer too small"); goto done;
+    }
+    if (seq_pack(&Q, &bq, &oq_) || seq_pack(&C, &bc, &oc_)) { PyErr_NoMemory(); goto done; }
+    int32_t *o = (int32_t *)out.buf;
+    int rc = ed_simd_available() ? ed_cross_simd_k(bq, oq_, Q.n, bc, oc_, C.n, o, groups)
+                                 : ed_cross(bq, oq_, Q.n, bc, oc_, C.n, o);
+    if (rc == -2) { PyErr_SetString(PyExc_ValueError, "groups must be 1, 2 or 4"); goto done; }
+    if (rc != 0) { PyErr_NoMemory(); goto done; }
+    if (k >= 0)
+        for (Py_ssize_t i = 0; i < Q.n * C.n; i++) if (o[i] > k) o[i] = k + 1;
+    ret = Py_None; Py_INCREF(ret);
+done:
+    free(bq); free(bc); free(oq_); free(oc_);
+    seq_free(&Q); seq_free(&C); PyBuffer_Release(&out);
     return ret;
 }
 
@@ -175,8 +226,9 @@ done:
 static PyMethodDef methods[] = {
     {"pack", py_pack, METH_VARARGS, "pack(seq) -> (buf bytes, int64 offsets bytes)"},
     {"pairs_simd", py_pairs_simd, METH_VARARGS, "pairs_simd(a, b, out, trim=True, k=4)"},
-    {"pairs", py_pairs, METH_VARARGS, "pairs(a, b, out, trim=True)"},
-    {"cross", py_cross, METH_VARARGS, "cross(q, c, out)"},
+    {"pairs", py_pairs, METH_VARARGS, "pairs(a, b, out, trim=True, k=-1)"},
+    {"cross", py_cross, METH_VARARGS, "cross(q, c, out, k=-1)"},
+    {"cross_simd", py_cross_simd, METH_VARARGS, "cross_simd(q, c, out, groups=4, k=-1)"},
     {NULL, NULL, 0, NULL},
 };
 

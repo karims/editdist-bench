@@ -6,29 +6,32 @@
 #include <vector>
 #include "gpu_myers.cuh"
 
-extern "C" int gpu_pair_distance_host(const u8 *a, int la, const u8 *b, int lb, int trim) {
+extern "C" int gpu_pair_distance_host(const u8 *a, int la, const u8 *b, int lb, int trim, int k) {
     switch (pair_class(la, lb)) {
-    case 0: return pair_distance_swar<16>(a, la, b, lb, trim);
-    case 1: return pair_distance_swar<32>(a, la, b, lb, trim);
-    case 2: return pair_distance_swar<64>(a, la, b, lb, trim);
-    case 3: return pair_distance_swar<128>(a, la, b, lb, trim);
-    case 4: return pair_distance_swar<256>(a, la, b, lb, trim);
+    case 0: return pair_distance_swar<16>(a, la, b, lb, trim, k);
+    case 1: return pair_distance_swar<32>(a, la, b, lb, trim, k);
+    case 2: return pair_distance_swar<64>(a, la, b, lb, trim, k);
+    case 3: return pair_distance_swar<128>(a, la, b, lb, trim, k);
+    case 4: return pair_distance_swar<256>(a, la, b, lb, trim, k);
     default: return -1;
     }
 }
 
 /* Same as the cross kernel's per-thread work: pattern a via a Peq table. */
-extern "C" int gpu_peq_distance_host(const u8 *a, int la, const u8 *b, int lb) {
-    if (la == 0) return lb;
+extern "C" int gpu_peq_distance_host(const u8 *a, int la, const u8 *b, int lb, int k) {
+    if (la == 0) return (k >= 0 && lb > k) ? k + 1 : lb;
     int nw = (la + 63) / 64;
     int NW = nw <= 1 ? 1 : nw <= 2 ? 2 : nw <= 4 ? 4 : nw <= 8 ? 8 : 0;
     if (!NW) return -1;
     std::vector<u64> peq((std::size_t)256 * NW, 0);
     for (int i = 0; i < la; i++) peq[(std::size_t)a[i] * NW + i / 64] |= 1ull << (i % 64);
     switch (NW) {
-    case 1: return text_distance_peq<1>(peq.data(), la, b, lb);
-    case 2: return text_distance_peq<2>(peq.data(), la, b, lb);
-    case 4: return text_distance_peq<4>(peq.data(), la, b, lb);
-    default: return text_distance_peq<8>(peq.data(), la, b, lb);
+    case 1: return text_distance_peq<1>(peq.data(), la, b, lb, k);
+    case 2: return text_distance_peq<2>(peq.data(), la, b, lb, k);
+    case 4: return text_distance_peq<4>(peq.data(), la, b, lb, k);
+    default: return text_distance_peq<8>(peq.data(), la, b, lb, k);
     }
 }
+
+/* store_result as the kernels use it, so the byte-output rule is tested too. */
+extern "C" int gpu_store8_host(int d) { u8 o = 0; store_result(&o, 0, d, 1); return o; }

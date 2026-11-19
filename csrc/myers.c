@@ -98,6 +98,50 @@ static int pair_distance(ws_t *ws, word *Pv, word *Mv,
     return d;
 }
 
+/* ---- Distance threshold ("is the distance <= k?") ----------------------
+ * With k >= 0 the result is min(distance, k + 1), so k + 1 means "more than
+ * k". Two exact shortcuts: |la - lb| > k answers at once, and the bottom-row
+ * score can fall by at most 1 per remaining text character, so once
+ * score - remaining > k the answer is already known. Separate functions keep
+ * the unthresholded paths (the benchmarked ones) unchanged. */
+static int run_text_k(const ws_t *ws, int m, const uint8_t *t, int n,
+                      word *Pv, word *Mv, int k) {
+    if ((n > m ? n - m : m - n) > k) return k + 1;
+    const int W = (m + 63) >> 6;
+    const int lastbit = (m - 1) & 63;
+    int score = m;
+    if (W == 1) {
+        word pv = ~(word)0, mv = 0;
+        for (int j = 0; j < n; j++) {
+            score += block_step(&pv, &mv, ws->peq[(size_t)t[j] * ws->W], 1, lastbit);
+            if (score - (n - 1 - j) > k) return k + 1;
+        }
+        return score;
+    }
+    for (int w = 0; w < W; w++) { Pv[w] = ~(word)0; Mv[w] = 0; }
+    for (int j = 0; j < n; j++) {
+        const word *eq = ws->peq + (size_t)t[j] * ws->W;
+        int h = 1;
+        for (int w = 0; w < W - 1; w++) h = block_step(&Pv[w], &Mv[w], eq[w], h, 63);
+        score += block_step(&Pv[W - 1], &Mv[W - 1], eq[W - 1], h, lastbit);
+        if (score - (n - 1 - j) > k) return k + 1;
+    }
+    return score;
+}
+
+static int pair_distance_k(ws_t *ws, word *Pv, word *Mv,
+                           const uint8_t *a, int la, const uint8_t *b, int lb, int trim, int k) {
+    if (k < 0) return pair_distance(ws, Pv, Mv, a, la, b, lb, trim);
+    if (trim) trim_affix(&a, &la, &b, &lb);
+    if (la > lb) { const uint8_t *t = a; a = b; b = t; int x = la; la = lb; lb = x; }
+    if (lb - la > k) return k + 1;
+    if (la == 0) return lb;
+    load_pattern(ws, a, la);
+    int d = run_text_k(ws, la, b, lb, Pv, Mv, k);
+    clear_pattern(ws, a, la);
+    return d;
+}
+
 static int max_words(const int64_t *off_a, const int64_t *off_b, int64_t n) {
     int64_t mx = 0;
     for (int64_t i = 0; i < n; i++) {
@@ -122,6 +166,23 @@ int ed_pairs_opt(const uint8_t *buf_a, const int64_t *off_a,
         out[i] = pair_distance(&ws, Pv, Mv,
                                buf_a + off_a[i], (int)(off_a[i + 1] - off_a[i]),
                                buf_b + off_b[i], (int)(off_b[i + 1] - off_b[i]), trim);
+    free(Pv); free(Mv); ws_free(&ws);
+    return 0;
+}
+
+/* Thresholded pairs on packed buffers: out[i] = min(d_i, k + 1). */
+int ed_pairs_k(const uint8_t *buf_a, const int64_t *off_a,
+               const uint8_t *buf_b, const int64_t *off_b,
+               int64_t n, int32_t *out, int trim, int k) {
+    int W = max_words(off_a, off_b, n);
+    ws_t ws;
+    if (ws_init(&ws, W)) return -1;
+    word *Pv = malloc(sizeof(word) * ws.W), *Mv = malloc(sizeof(word) * ws.W);
+    if (!Pv || !Mv) { free(Pv); free(Mv); ws_free(&ws); return -1; }
+    for (int64_t i = 0; i < n; i++)
+        out[i] = pair_distance_k(&ws, Pv, Mv,
+                                 buf_a + off_a[i], (int)(off_a[i + 1] - off_a[i]),
+                                 buf_b + off_b[i], (int)(off_b[i + 1] - off_b[i]), trim, k);
     free(Pv); free(Mv); ws_free(&ws);
     return 0;
 }
